@@ -1,0 +1,16 @@
+{
+  "version": 2,
+  "dgSpecHash": "Wi8JYCJjlIjmSpYFNw+ZrYKEFJCnejTaA4DKo6vLFkpwBHy2AbkfFpkIQg8cJl4NF9m2fdL4b0LkO7Xg1IPwig==",
+  "success": true,
+  "projectFilePath": "/home/kllv/github/sustainability-canvas-api/sustainability-canvas-api.csproj",
+  "expectedPackageFiles": [
+    "/home/kllv/.nuget/packages/microsoft.aspnetcore.openapi/8.0.21/microsoft.aspnetcore.openapi.8.0.21.nupkg.sha512",
+    "/home/kllv/.nuget/packages/microsoft.extensions.apidescription.server/6.0.5/microsoft.extensions.apidescription.server.6.0.5.nupkg.sha512",
+    "/home/kllv/.nuget/packages/microsoft.openapi/1.6.14/microsoft.openapi.1.6.14.nupkg.sha512",
+    "/home/kllv/.nuget/packages/swashbuckle.aspnetcore/6.6.2/swashbuckle.aspnetcore.6.6.2.nupkg.sha512",
+    "/home/kllv/.nuget/packages/swashbuckle.aspnetcore.swagger/6.6.2/swashbuckle.aspnetcore.swagger.6.6.2.nupkg.sha512",
+    "/home/kllv/.nuget/packages/swashbuckle.aspnetcore.swaggergen/6.6.2/swashbuckle.aspnetcore.swaggergen.6.6.2.nupkg.sha512",
+    "/home/kllv/.nuget/packages/swashbuckle.aspnetcore.swaggerui/6.6.2/swashbuckle.aspnetcore.swaggerui.6.6.2.nupkg.sha512"
+  ],
+  "logs": []
+}

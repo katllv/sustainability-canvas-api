@@ -1,0 +1,6 @@
+@sustainability_canvas_api_HostAddress = http://localhost:5292
+
+GET {{sustainability_canvas_api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
