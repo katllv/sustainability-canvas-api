@@ -12,11 +12,13 @@ public class SdgsFunction
 {
     private readonly SustainabilityCanvasContext _context;
     private readonly ILogger<SdgsFunction> _logger;
+    private readonly JsonSerializerOptions _jsonOptions;
 
-    public SdgsFunction(SustainabilityCanvasContext context, ILogger<SdgsFunction> logger)
+    public SdgsFunction(SustainabilityCanvasContext context, ILogger<SdgsFunction> logger, JsonSerializerOptions jsonOptions)
     {
         _context = context;
         _logger = logger;
+        _jsonOptions = jsonOptions;
     }
 
     [Function("GetSdgs")]
@@ -32,7 +34,7 @@ public class SdgsFunction
             var response = req.CreateResponse(HttpStatusCode.OK);
             response.Headers.Add("Content-Type", "application/json; charset=utf-8");
             
-            await response.WriteStringAsync(JsonSerializer.Serialize(sdgs));
+            await response.WriteStringAsync(JsonSerializer.Serialize(sdgs, _jsonOptions));
             return response;
         }
         catch (Exception ex)

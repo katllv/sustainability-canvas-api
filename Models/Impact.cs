@@ -66,4 +66,6 @@ public class Impact
 
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
+    // to get associated SDGs
+    public ICollection<ImpactSdg> ImpactSdgs { get; set; } = new List<ImpactSdg>();
 }

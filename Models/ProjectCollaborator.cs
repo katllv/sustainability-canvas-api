@@ -22,4 +22,8 @@ public class ProjectCollaborator
 
     [Required]
     public CollaboratorRole Role { get; set; } = CollaboratorRole.Viewer;
+
+    // to get associated Profile and Project
+    public Profile Profile { get; set; } = null!;
+    public Project Project { get; set; } = null!;
 }

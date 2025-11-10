@@ -23,6 +23,19 @@ public class SustainabilityCanvasContext : DbContext
         modelBuilder.Entity<ImpactSdg>()
             .HasKey(x => new { x.ImpactId, x.SdgId });
 
+        // Configure ImpactSdg relationships with navigation properties
+        modelBuilder.Entity<ImpactSdg>()
+            .HasOne(impactSdg => impactSdg.Impact)
+            .WithMany(i => i.ImpactSdgs)
+            .HasForeignKey(impactSdg => impactSdg.ImpactId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ImpactSdg>()
+            .HasOne(impactSdg => impactSdg.Sdg)
+            .WithMany()
+            .HasForeignKey(impactSdg => impactSdg.SdgId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         // When Project is deleted -> delete all Impacts
         modelBuilder.Entity<Impact>()
             .HasOne<Project>()
@@ -30,18 +43,18 @@ public class SustainabilityCanvasContext : DbContext
             .HasForeignKey(i => i.ProjectId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // When Impact is deleted -> delete all ImpactSdgs
-        modelBuilder.Entity<ImpactSdg>()
-            .HasOne<Impact>()
-            .WithMany()
-            .HasForeignKey(impactSdg => impactSdg.ImpactId)
-            .OnDelete(DeleteBehavior.Cascade);
-
-        // When Project is deleted -> delete all ProjectCollaborators
+        // Configure ProjectCollaborator relationships with navigation properties
         modelBuilder.Entity<ProjectCollaborator>()
-            .HasOne<Project>()
+            .HasOne(pc => pc.Project)
             .WithMany()
             .HasForeignKey(pc => pc.ProjectId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+// When Profile is deleted -> delete all their collaborations
+        modelBuilder.Entity<ProjectCollaborator>()
+            .HasOne(pc => pc.Profile)
+            .WithMany()
+            .HasForeignKey(pc => pc.ProfileId)
             .OnDelete(DeleteBehavior.Cascade);
 
         // Don't delete Profile if they have projects

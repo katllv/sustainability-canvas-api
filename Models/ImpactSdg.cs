@@ -11,4 +11,8 @@ public class ImpactSdg
 
     [Key, Column(Order = 1)]
     public int SdgId { get; set; }     // FK to Sdg
+
+    // to get associated Impact and Sdg
+    public Impact Impact { get; set; } = null!;
+    public Sdg Sdg { get; set; } = null!;
 }
