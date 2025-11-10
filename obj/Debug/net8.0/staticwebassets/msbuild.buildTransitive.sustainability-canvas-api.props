@@ -1,3 +1,0 @@
-﻿<Project>
-  <Import Project="../buildMultiTargeting/sustainability-canvas-api.props" />
-</Project>

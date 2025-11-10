@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("sustainability-canvas-api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+933fde0cbf64422539f72e3e667766dc3fc111ce")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+19590a9ca4a9698eb0e358cd5ba24bd99a8c0ba7")]
 [assembly: System.Reflection.AssemblyProductAttribute("sustainability-canvas-api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("sustainability-canvas-api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

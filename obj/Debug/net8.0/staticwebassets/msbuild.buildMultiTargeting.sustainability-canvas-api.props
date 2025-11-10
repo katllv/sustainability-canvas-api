@@ -1,3 +1,0 @@
-﻿<Project>
-  <Import Project="../build/sustainability-canvas-api.props" />
-</Project>

@@ -5,10 +5,7 @@ namespace SustainabilityCanvas.Api.Models;
 public class Sdg
 {
     [Key]
-    public int Id { get; set; }
-    
-    [Required]
-    public int Number { get; set; } // 1-17
+    public int Id { get; set; } // 1-17
     
     [Required]
     [MaxLength(200)]
