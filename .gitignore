@@ -318,6 +318,7 @@ MigrationBackup/
 
 # IMPORTANT: Development settings with secrets
 appsettings.Development.json
+local.settings.json
 
 # Environment files
 .env
