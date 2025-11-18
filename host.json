@@ -8,5 +8,16 @@
       },
       "enableLiveMetricsFilters": true
     }
+  },
+  "extensions": {
+    "http": {
+      "cors": {
+        "allowedOrigins": [
+          "https://agreeable-hill-0630dd403.3.azurestaticapps.net",
+          "http://localhost:5173"
+        ],
+        "allowCredentials": false
+      }
+    }
   }
 }

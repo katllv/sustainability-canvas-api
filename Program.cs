@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using SustainabilityCanvas.Api.Data;
+using SustainabilityCanvas.Api.Services;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -21,6 +22,15 @@ var host = new HostBuilder()
             var connectionString = context.Configuration.GetConnectionString("DefaultConnection");
             options.UseNpgsql(connectionString);
         });
+        
+        // Add JWT Service
+        services.AddSingleton<JwtService>();
+        
+        // Add Registration Code Service
+        services.AddScoped<RegistrationCodeService>();
+        
+        // Add Master Password Service
+        services.AddScoped<MasterPasswordService>();
         
         // Configure shared JSON serialization options
         services.AddSingleton<JsonSerializerOptions>(provider =>
