@@ -16,6 +16,8 @@ public class SustainabilityCanvasContext : DbContext
     public DbSet<Impact> Impacts { get; set; }
     public DbSet<Sdg> Sdgs { get; set; }
     public DbSet<ImpactSdg> ImpactSdgs { get; set; }
+    public DbSet<User> Users { get; set; }
+    public DbSet<AppSetting> AppSettings { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -50,7 +52,7 @@ public class SustainabilityCanvasContext : DbContext
             .HasForeignKey(pc => pc.ProjectId)
             .OnDelete(DeleteBehavior.Cascade);
 
-// When Profile is deleted -> delete all their collaborations
+        // When Profile is deleted -> delete all their collaborations
         modelBuilder.Entity<ProjectCollaborator>()
             .HasOne(pc => pc.Profile)
             .WithMany()
@@ -63,6 +65,29 @@ public class SustainabilityCanvasContext : DbContext
             .WithMany()
             .HasForeignKey(p => p.ProfileId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // Unique Username
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.HasIndex(u => u.Username).IsUnique();
+            entity.Property(u => u.Username).HasMaxLength(50);
+        });
+
+        // One-to-one User-Profile relationship, delete Profile if User is deleted
+        modelBuilder.Entity<Profile>(entity =>
+        {
+            entity.HasOne(p => p.User)
+                .WithOne(u => u.Profile)
+                .HasForeignKey<Profile>(p => p.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Configure AppSetting
+        modelBuilder.Entity<AppSetting>(entity =>
+        {
+            entity.HasKey(a => a.Key);
+            entity.Property(a => a.Key).HasMaxLength(100);
+        });
 
         // Seed SDG data
         modelBuilder.Entity<Sdg>()

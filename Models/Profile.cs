@@ -14,4 +14,8 @@ public class Profile
     public string Email { get; set; } = string.Empty;
     
     public string? ProfileUrl { get; set; }
+
+    // Navigation to User
+    public int UserId { get; set; }
+    public User User { get; set; } = null!;
 }

@@ -1,0 +1,107 @@
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+
+namespace SustainabilityCanvas.Api.Services;
+
+public class JwtService
+{
+    private readonly string _secretKey;
+    private readonly string _issuer;
+    private readonly string _audience;
+    private readonly int _expirationHours;
+
+    public JwtService()
+    {
+        // In production, these should come from configuration/environment variables
+        _secretKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY") ?? "your-super-secret-key-that-should-be-at-least-32-characters-long";
+        _issuer = Environment.GetEnvironmentVariable("JWT_ISSUER") ?? "sustainability-canvas-api";
+        _audience = Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? "sustainability-canvas-client";
+        _expirationHours = int.Parse(Environment.GetEnvironmentVariable("JWT_EXPIRATION_HOURS") ?? "24");
+    }
+
+    public string GenerateToken(int userId, string username, string role)
+    {
+        var tokenHandler = new JwtSecurityTokenHandler();
+        var key = Encoding.ASCII.GetBytes(_secretKey);
+
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, userId.ToString()),
+            new(ClaimTypes.Name, username),
+            new(ClaimTypes.Role, role),
+            new("userId", userId.ToString()),
+            new("username", username)
+        };
+
+        var tokenDescriptor = new SecurityTokenDescriptor
+        {
+            Subject = new ClaimsIdentity(claims),
+            Expires = DateTime.UtcNow.AddHours(_expirationHours),
+            Issuer = _issuer,
+            Audience = _audience,
+            SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
+        };
+
+        var token = tokenHandler.CreateToken(tokenDescriptor);
+        return tokenHandler.WriteToken(token);
+    }
+
+    public ClaimsPrincipal? ValidateToken(string token)
+    {
+        try
+        {
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var key = Encoding.ASCII.GetBytes(_secretKey);
+
+            var validationParameters = new TokenValidationParameters
+            {
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = new SymmetricSecurityKey(key),
+                ValidateIssuer = true,
+                ValidIssuer = _issuer,
+                ValidateAudience = true,
+                ValidAudience = _audience,
+                ValidateLifetime = true,
+                ClockSkew = TimeSpan.Zero // Remove delay of token when expire
+            };
+
+            var principal = tokenHandler.ValidateToken(token, validationParameters, out var validatedToken);
+            return principal;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public bool IsTokenValid(string token)
+    {
+        return ValidateToken(token) != null;
+    }
+
+    public string? GetUserIdFromToken(string token)
+    {
+        var principal = ValidateToken(token);
+        return principal?.FindFirst("userId")?.Value;
+    }
+
+    public string? GetUsernameFromToken(string token)
+    {
+        var principal = ValidateToken(token);
+        return principal?.FindFirst("username")?.Value;
+    }
+
+    public string? GetRoleFromToken(string token)
+    {
+        var principal = ValidateToken(token);
+        return principal?.FindFirst(ClaimTypes.Role)?.Value;
+    }
+
+    public bool IsAdmin(string token)
+    {
+        var role = GetRoleFromToken(token);
+        return role?.Equals("Admin", StringComparison.OrdinalIgnoreCase) == true;
+    }
+}
