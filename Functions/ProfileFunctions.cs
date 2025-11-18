@@ -3,6 +3,7 @@ using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SustainabilityCanvas.Api.Data;
+using SustainabilityCanvas.Api.Attributes;
 using System.Net;
 using System.Text.Json;
 
@@ -21,41 +22,21 @@ public class ProfileFunctions
         _jsonOptions = jsonOptions;
     }
 
-    [Function("GetProfiles")]
-    public async Task<HttpResponseData> GetProfiles(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "profiles")] HttpRequestData req)
-    {
-        _logger.LogInformation("Getting all profiles");
 
-        try
-        {
-            var profiles = await _context.Profiles.ToListAsync();
-            
-            var response = req.CreateResponse(HttpStatusCode.OK);
-            response.Headers.Add("Content-Type", "application/json; charset=utf-8");
-            
-            await response.WriteStringAsync(JsonSerializer.Serialize(profiles, _jsonOptions));
-            return response;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting profiles");
-            
-            var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
-            await errorResponse.WriteStringAsync("An error occurred while getting profiles");
-            return errorResponse;
-        }
-    }
 
     [Function("GetProfileById")]
+    [JwtAuth]
     public async Task<HttpResponseData> GetProfileById(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "profiles/{id}")] HttpRequestData req,
-        int id)
+        int id,
+        FunctionContext context)
     {
         _logger.LogInformation($"Getting profile with ID: {id}");
 
         try
         {
+            var authInfo = req.ValidateJwtIfRequired(context);
+
             var profile = await _context.Profiles.FindAsync(id);
             if (profile == null)
             {
@@ -64,11 +45,24 @@ public class ProfileFunctions
                 return notFoundResponse;
             }
 
+            // Check if user can access this profile (own profile or admin)
+            if (authInfo.HasValue && !authInfo.Value.IsAdmin && profile.UserId != authInfo.Value.UserId)
+            {
+                var forbidden = req.CreateResponse(HttpStatusCode.Forbidden);
+                await forbidden.WriteStringAsync("You can only view your own profile");
+                return forbidden;
+            }
+
             var response = req.CreateResponse(HttpStatusCode.OK);
             response.Headers.Add("Content-Type", "application/json; charset=utf-8");
 
-            await response.WriteStringAsync(JsonSerializer.Serialize(profile));
+            await response.WriteStringAsync(JsonSerializer.Serialize(profile, _jsonOptions));
             return response;
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogWarning("Unauthorized access attempt: {Message}", ex.Message);
+            return req.CreateUnauthorizedResponse(ex.Message);
         }
         catch (Exception ex)
         {
@@ -80,97 +74,34 @@ public class ProfileFunctions
         }
     }
 
-    [Function("CreateProfile")]
-    public async Task<HttpResponseData> CreateProfile(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "profiles")] HttpRequestData req)
-    {
-        _logger.LogInformation("Creating a new profile");
-        try
-        {
-            var requestBody = await req.ReadAsStringAsync();
-            
-            if (string.IsNullOrEmpty(requestBody))
-            {
-                var badRequestResponse = req.CreateResponse(HttpStatusCode.BadRequest);
-                await badRequestResponse.WriteStringAsync("Request body is empty");
-                return badRequestResponse;
-            }
-            
-            var newProfile = JsonSerializer.Deserialize<Models.Profile>(requestBody, _jsonOptions);
-
-            if (newProfile == null)
-            {
-                var badRequestResponse = req.CreateResponse(HttpStatusCode.BadRequest);
-                await badRequestResponse.WriteStringAsync("Invalid profile data");
-                return badRequestResponse;
-            }
-
-            _context.Profiles.Add(newProfile);
-            await _context.SaveChangesAsync();
-
-            var response = req.CreateResponse(HttpStatusCode.Created);
-            response.Headers.Add("Content-Type", "application/json; charset=utf-8");
-
-            await response.WriteStringAsync(JsonSerializer.Serialize(newProfile, _jsonOptions));
-            return response;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating profile");
-
-            var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
-            await errorResponse.WriteStringAsync("An error occurred while creating the profile");
-            return errorResponse;
-        }
-    }
-
-    [Function("DeleteProfile")]
-    public async Task<HttpResponseData> DeleteProfile(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "profiles/{id}")] HttpRequestData req,
-        int id)
-    {
-        _logger.LogInformation($"Deleting profile with ID: {id}");
-        try
-        {
-            var profile = await _context.Profiles.FindAsync(id);
-            if (profile == null)
-            {
-                var notFoundResponse = req.CreateResponse(HttpStatusCode.NotFound);
-                await notFoundResponse.WriteStringAsync($"Profile with ID {id} not found");
-                return notFoundResponse;
-            }
-
-            _context.Profiles.Remove(profile);
-            await _context.SaveChangesAsync();
-
-            var response = req.CreateResponse(HttpStatusCode.NoContent);
-            return response;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, $"Error deleting profile with ID: {id}");
-
-            var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
-            await errorResponse.WriteStringAsync("An error occurred while deleting the profile");
-            return errorResponse;
-        }
-    }
 
     [Function("UpdateProfile")]
+    [JwtAuth]
     public async Task<HttpResponseData> UpdateProfile(
         [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "profiles/{id}")] HttpRequestData req,
-        int id)
+        int id,
+        FunctionContext context)
     {
         _logger.LogInformation($"Updating profile with ID: {id}");
 
         try
         {
+            var authInfo = req.ValidateJwtIfRequired(context);
+
             var profile = await _context.Profiles.FindAsync(id);
             if (profile == null)
             {
                 var notFoundResponse = req.CreateResponse(HttpStatusCode.NotFound);
                 await notFoundResponse.WriteStringAsync($"Profile with ID {id} not found");
                 return notFoundResponse;
+            }
+
+            // Check if user owns this profile (users can only edit their own profiles)
+            if (authInfo.HasValue && profile.UserId != authInfo.Value.UserId)
+            {
+                var forbidden = req.CreateResponse(HttpStatusCode.Forbidden);
+                await forbidden.WriteStringAsync("You can only edit your own profile");
+                return forbidden;
             }
 
             var requestBody = await req.ReadAsStringAsync();
@@ -203,6 +134,11 @@ public class ProfileFunctions
 
             await response.WriteStringAsync(JsonSerializer.Serialize(profile, _jsonOptions));
             return response;
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogWarning("Unauthorized access attempt: {Message}", ex.Message);
+            return req.CreateUnauthorizedResponse(ex.Message);
         }
         catch (Exception ex)
         {

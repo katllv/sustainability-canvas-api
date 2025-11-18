@@ -3,6 +3,7 @@ using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SustainabilityCanvas.Api.Data;
+using SustainabilityCanvas.Api.Attributes;
 using System.Net;
 using System.Text.Json;
 
@@ -22,13 +23,17 @@ public class SdgsFunction
     }
 
     [Function("GetSdgs")]
+    [JwtAuth]
     public async Task<HttpResponseData> GetSdgs(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "sdgs")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "sdgs")] HttpRequestData req,
+        FunctionContext context)
     {
         _logger.LogInformation("Getting all SDGs");
 
         try
         {
+            var authInfo = req.ValidateJwtIfRequired(context);
+            
             var sdgs = await _context.Sdgs.ToListAsync();
             
             var response = req.CreateResponse(HttpStatusCode.OK);
@@ -36,6 +41,11 @@ public class SdgsFunction
             
             await response.WriteStringAsync(JsonSerializer.Serialize(sdgs, _jsonOptions));
             return response;
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogWarning("Unauthorized access attempt: {Message}", ex.Message);
+            return req.CreateUnauthorizedResponse(ex.Message);
         }
         catch (Exception ex)
         {

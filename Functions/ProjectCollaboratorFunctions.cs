@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SustainabilityCanvas.Api.Data;
 using SustainabilityCanvas.Api.Models;
+using SustainabilityCanvas.Api.Attributes;
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -31,14 +32,17 @@ public class ProjectCollaboratorFunctions
     }
 
     [Function("GetProjectCollaborators")]
+    [JwtAuth]
     public async Task<HttpResponseData> GetProjectCollaborators(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "projects/{projectId}/collaborators")] HttpRequestData req,
-        int projectId)
+        int projectId,
+        FunctionContext context)
     {
         _logger.LogInformation($"Getting collaborators for project ID: {projectId}");
 
         try
         {
+            var authInfo = req.ValidateJwtIfRequired(context);
             var collaborators = await _context.ProjectCollaborators
                 .Where(pc => pc.ProjectId == projectId)
                 .Include(pc => pc.Profile)
@@ -49,6 +53,11 @@ public class ProjectCollaboratorFunctions
 
             await response.WriteStringAsync(JsonSerializer.Serialize(collaborators, _jsonOptions));
             return response;
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogWarning("Unauthorized access attempt: {Message}", ex.Message);
+            return req.CreateUnauthorizedResponse(ex.Message);
         }
         catch (Exception ex)
         {
@@ -61,14 +70,17 @@ public class ProjectCollaboratorFunctions
     }
 
     [Function("AddProjectCollaborator")]
+    [JwtAuth]
     public async Task<HttpResponseData> AddProjectCollaborator(
         [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "projects/{projectId}/collaborators")] HttpRequestData req,
-        int projectId)
+        int projectId,
+        FunctionContext context)
     {
         _logger.LogInformation($"Adding collaborator to project ID: {projectId}");
 
         try
         {
+            var authInfo = req.ValidateJwtIfRequired(context);
             var requestBody = await req.ReadAsStringAsync();
 
             if (string.IsNullOrEmpty(requestBody))
@@ -137,6 +149,11 @@ public class ProjectCollaboratorFunctions
             await response.WriteStringAsync(JsonSerializer.Serialize(createdCollaborator, _jsonOptions));
             return response;
         }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogWarning("Unauthorized access attempt: {Message}", ex.Message);
+            return req.CreateUnauthorizedResponse(ex.Message);
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, $"Error adding collaborator to project ID: {projectId}");
@@ -148,14 +165,17 @@ public class ProjectCollaboratorFunctions
     }
 
     [Function("UpdateCollaboratorRole")]
+    [JwtAuth]
     public async Task<HttpResponseData> UpdateCollaboratorRole(
         [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "collaborators/{collaboratorId}")] HttpRequestData req,
-        int collaboratorId)
+        int collaboratorId,
+        FunctionContext context)
     {
         _logger.LogInformation($"Updating collaborator ID: {collaboratorId}");
 
         try
         {
+            var authInfo = req.ValidateJwtIfRequired(context);
             var existingCollaborator = await _context.ProjectCollaborators
                 .Include(pc => pc.Profile)
                 .FirstOrDefaultAsync(pc => pc.Id == collaboratorId);
@@ -194,6 +214,11 @@ public class ProjectCollaboratorFunctions
             await response.WriteStringAsync(JsonSerializer.Serialize(existingCollaborator, _jsonOptions));
             return response;
         }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogWarning("Unauthorized access attempt: {Message}", ex.Message);
+            return req.CreateUnauthorizedResponse(ex.Message);
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, $"Error updating collaborator ID: {collaboratorId}");
@@ -205,14 +230,17 @@ public class ProjectCollaboratorFunctions
     }
 
     [Function("RemoveCollaborator")]
+    [JwtAuth]
     public async Task<HttpResponseData> RemoveCollaborator(
         [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "collaborators/{collaboratorId}")] HttpRequestData req,
-        int collaboratorId)
+        int collaboratorId,
+        FunctionContext context)
     {
         _logger.LogInformation($"Removing collaborator ID: {collaboratorId}");
 
         try
         {
+            var authInfo = req.ValidateJwtIfRequired(context);
             var collaborator = await _context.ProjectCollaborators.FindAsync(collaboratorId);
             if (collaborator == null)
             {
@@ -227,6 +255,11 @@ public class ProjectCollaboratorFunctions
             var response = req.CreateResponse(HttpStatusCode.NoContent);
             return response;
         }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogWarning("Unauthorized access attempt: {Message}", ex.Message);
+            return req.CreateUnauthorizedResponse(ex.Message);
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, $"Error removing collaborator ID: {collaboratorId}");
@@ -238,14 +271,17 @@ public class ProjectCollaboratorFunctions
     }
 
     [Function("GetUserProjects")]
+    [JwtAuth]
     public async Task<HttpResponseData> GetUserProjects(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "profiles/{profileId}/collaborations")] HttpRequestData req,
-        int profileId)
+        int profileId,
+        FunctionContext context)
     {
         _logger.LogInformation($"Getting projects for profile ID: {profileId}");
 
         try
         {
+            var authInfo = req.ValidateJwtIfRequired(context);
             var collaborations = await _context.ProjectCollaborators
                 .Where(pc => pc.ProfileId == profileId)
                 .Include(pc => pc.Project)
@@ -256,6 +292,11 @@ public class ProjectCollaboratorFunctions
 
             await response.WriteStringAsync(JsonSerializer.Serialize(collaborations, _jsonOptions));
             return response;
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogWarning("Unauthorized access attempt: {Message}", ex.Message);
+            return req.CreateUnauthorizedResponse(ex.Message);
         }
         catch (Exception ex)
         {

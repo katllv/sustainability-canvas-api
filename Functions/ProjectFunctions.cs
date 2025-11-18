@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SustainabilityCanvas.Api.Data;
 using SustainabilityCanvas.Api.Models;
+using SustainabilityCanvas.Api.Attributes;
 using System.Net;
 using System.Text.Json;
 
@@ -23,13 +24,17 @@ public class ProjectFunctions
     }
 
     [Function("GetProjects")]
+    [JwtAuth]
     public async Task<HttpResponseData> GetProjects(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "projects")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "projects")] HttpRequestData req,
+        FunctionContext context)
     {
         _logger.LogInformation("Getting all projects");
 
         try
         {
+            var authInfo = req.ValidateJwtIfRequired(context);
+
             var projects = await _context.Projects.ToListAsync();
             
             var response = req.CreateResponse(HttpStatusCode.OK);
@@ -37,6 +42,11 @@ public class ProjectFunctions
             
             await response.WriteStringAsync(JsonSerializer.Serialize(projects, _jsonOptions));
             return response;
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogWarning("Unauthorized access attempt: {Message}", ex.Message);
+            return req.CreateUnauthorizedResponse(ex.Message);
         }
         catch (Exception ex)
         {
@@ -49,14 +59,18 @@ public class ProjectFunctions
     }
 
     [Function("GetProjectById")]
+    [JwtAuth]
     public async Task<HttpResponseData> GetProjectById(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "projects/{id}")] HttpRequestData req,
-        int id)
+        int id,
+        FunctionContext context)
     {
         _logger.LogInformation($"Getting project with ID: {id}");
 
         try
         {
+            var authInfo = req.ValidateJwtIfRequired(context);
+
             var project = await _context.Projects.FindAsync(id);
             if (project == null)
             {
@@ -70,6 +84,11 @@ public class ProjectFunctions
             await response.WriteStringAsync(JsonSerializer.Serialize(project, _jsonOptions));
             return response;
         }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogWarning("Unauthorized access attempt: {Message}", ex.Message);
+            return req.CreateUnauthorizedResponse(ex.Message);
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, $"Error getting project with ID: {id}");
@@ -81,13 +100,17 @@ public class ProjectFunctions
     }
 
     [Function("CreateProject")]
+    [JwtAuth]
     public async Task<HttpResponseData> CreateProject(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "projects")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "projects")] HttpRequestData req,
+        FunctionContext context)
     {
         _logger.LogInformation("Creating a new project");
 
         try
         {
+            var authInfo = req.ValidateJwtIfRequired(context);
+
             var requestBody = await new StreamReader(req.Body).ReadToEndAsync();
             var project = JsonSerializer.Deserialize<Project>(requestBody, _jsonOptions);
 
@@ -106,6 +129,11 @@ public class ProjectFunctions
             await response.WriteStringAsync(JsonSerializer.Serialize(project, _jsonOptions));
             return response;
         }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogWarning("Unauthorized access attempt: {Message}", ex.Message);
+            return req.CreateUnauthorizedResponse(ex.Message);
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating project");
@@ -117,14 +145,18 @@ public class ProjectFunctions
     }
 
     [Function("DeleteProject")]
+    [JwtAuth]
     public async Task<HttpResponseData> DeleteProject(
         [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "projects/{id}")] HttpRequestData req,
-        int id)
+        int id,
+        FunctionContext context)
     {
         _logger.LogInformation($"Deleting project with ID: {id}");
 
         try
         {
+            var authInfo = req.ValidateJwtIfRequired(context);
+
             var project = await _context.Projects.FindAsync(id);
             if (project == null)
             {
@@ -139,6 +171,11 @@ public class ProjectFunctions
             var response = req.CreateResponse(HttpStatusCode.NoContent);
             return response;
         }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogWarning("Unauthorized access attempt: {Message}", ex.Message);
+            return req.CreateUnauthorizedResponse(ex.Message);
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, $"Error deleting project with ID: {id}");
@@ -150,14 +187,18 @@ public class ProjectFunctions
     }
 
     [Function("UpdateProject")]
+    [JwtAuth]
     public async Task<HttpResponseData> UpdateProject(
         [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "projects/{id}")] HttpRequestData req,
-        int id)
+        int id,
+        FunctionContext context)
     {
         _logger.LogInformation($"Updating project with ID: {id}");
 
         try
         {
+            var authInfo = req.ValidateJwtIfRequired(context);
+
             var existingProject = await _context.Projects.FindAsync(id);
             if (existingProject == null)
             {
@@ -188,6 +229,11 @@ public class ProjectFunctions
             await response.WriteStringAsync(JsonSerializer.Serialize(existingProject, _jsonOptions));
             return response;
         }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogWarning("Unauthorized access attempt: {Message}", ex.Message);
+            return req.CreateUnauthorizedResponse(ex.Message);
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, $"Error updating project with ID: {id}");
@@ -199,14 +245,18 @@ public class ProjectFunctions
     }
 
     [Function("GetProjectsByProfileId")]
+    [JwtAuth]
     public async Task<HttpResponseData> GetProjectsByProfileId(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "profiles/{profileId}/projects")] HttpRequestData req,
-        int profileId)
+        int profileId,
+        FunctionContext context)
     {
         _logger.LogInformation($"Getting projects for profile ID: {profileId}");
 
         try
         {
+            var authInfo = req.ValidateJwtIfRequired(context);
+
             var projects = await _context.Projects
                 .Where(p => p.ProfileId == profileId)
                 .ToListAsync();
@@ -215,6 +265,11 @@ public class ProjectFunctions
             response.Headers.Add("Content-Type", "application/json; charset=utf-8");
             await response.WriteStringAsync(JsonSerializer.Serialize(projects, _jsonOptions));
             return response;
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogWarning("Unauthorized access attempt: {Message}", ex.Message);
+            return req.CreateUnauthorizedResponse(ex.Message);
         }
         catch (Exception ex)
         {

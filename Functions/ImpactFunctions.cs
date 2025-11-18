@@ -3,6 +3,7 @@ using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SustainabilityCanvas.Api.Data;
+using SustainabilityCanvas.Api.Attributes;
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -35,12 +36,16 @@ public class ImpactFunctions
     }
 
     [Function("GetImpacts")]
+    [JwtAuth]
     public async Task<HttpResponseData> GetImpacts(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "impacts")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "impacts")] HttpRequestData req,
+        FunctionContext context)
     {
         _logger.LogInformation("Getting all Impacts");
         try
         {
+            var authInfo = req.ValidateJwtIfRequired(context);
+
             var impacts = await _context.Impacts
                 .Include(i => i.ImpactSdgs)
                 .ThenInclude(impactSdg => impactSdg.Sdg)
@@ -51,6 +56,11 @@ public class ImpactFunctions
             
             await response.WriteStringAsync(JsonSerializer.Serialize(impacts, _jsonOptions));
             return response;
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogWarning("Unauthorized access attempt: {Message}", ex.Message);
+            return req.CreateUnauthorizedResponse(ex.Message);
         }
         catch (Exception ex)
         {
@@ -63,14 +73,17 @@ public class ImpactFunctions
     }
 
     [Function("GetImpactById")]
+    [JwtAuth]
     public async Task<HttpResponseData> GetImpactById(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "impacts/{id}")] HttpRequestData req,
-        int id)
+        int id,
+        FunctionContext context)
     {
         _logger.LogInformation($"Getting Impact with ID: {id}");
 
         try
         {
+            var authInfo = req.ValidateJwtIfRequired(context);
             var impact = await _context.Impacts
                 .Include(i => i.ImpactSdgs)
                 .ThenInclude(impactSdg => impactSdg.Sdg)
@@ -89,6 +102,11 @@ public class ImpactFunctions
             await response.WriteStringAsync(JsonSerializer.Serialize(impact, _jsonOptions));
             return response;
         }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogWarning("Unauthorized access attempt: {Message}", ex.Message);
+            return req.CreateUnauthorizedResponse(ex.Message);
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, $"Error getting Impact with ID: {id}");
@@ -100,14 +118,17 @@ public class ImpactFunctions
     }
 
     [Function("GetImpactsByProjectId")]
+    [JwtAuth]
     public async Task<HttpResponseData> GetImpactsByProjectId(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "projects/{projectId}/impacts")] HttpRequestData req,
-        int projectId)
+        int projectId,
+        FunctionContext context)
     {
         _logger.LogInformation($"Getting Impacts for Project ID: {projectId}");
 
         try
         {
+            var authInfo = req.ValidateJwtIfRequired(context);
             var impacts = await _context.Impacts
                 .Where(i => i.ProjectId == projectId)
                 .Include(i => i.ImpactSdgs)
@@ -120,6 +141,11 @@ public class ImpactFunctions
             await response.WriteStringAsync(JsonSerializer.Serialize(impacts, _jsonOptions));
             return response;
         }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogWarning("Unauthorized access attempt: {Message}", ex.Message);
+            return req.CreateUnauthorizedResponse(ex.Message);
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, $"Error getting Impacts for Project ID: {projectId}");
@@ -131,13 +157,16 @@ public class ImpactFunctions
     }
 
     [Function("CreateImpact")]
+    [JwtAuth]
     public async Task<HttpResponseData> CreateImpact(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "impacts")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "impacts")] HttpRequestData req,
+        FunctionContext context)
     {
         _logger.LogInformation("Creating a new Impact");
 
         try
         {
+            var authInfo = req.ValidateJwtIfRequired(context);
             var requestBody = await req.ReadAsStringAsync();
             
             if (string.IsNullOrEmpty(requestBody))
@@ -195,6 +224,11 @@ public class ImpactFunctions
             await response.WriteStringAsync(JsonSerializer.Serialize(createdImpact, _jsonOptions));
             return response;
         }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogWarning("Unauthorized access attempt: {Message}", ex.Message);
+            return req.CreateUnauthorizedResponse(ex.Message);
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating Impact");
@@ -206,14 +240,17 @@ public class ImpactFunctions
     }
 
     [Function("DeleteImpact")]
+    [JwtAuth]
     public async Task<HttpResponseData> DeleteImpact(
         [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "impacts/{id}")] HttpRequestData req,
-        int id)
+        int id,
+        FunctionContext context)
     {
         _logger.LogInformation($"Deleting Impact with ID: {id}");
 
         try
         {
+            var authInfo = req.ValidateJwtIfRequired(context);
             var impact = await _context.Impacts.FindAsync(id);
             if (impact == null)
             {
@@ -228,6 +265,11 @@ public class ImpactFunctions
             var response = req.CreateResponse(HttpStatusCode.NoContent);
             return response;
         }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogWarning("Unauthorized access attempt: {Message}", ex.Message);
+            return req.CreateUnauthorizedResponse(ex.Message);
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, $"Error deleting Impact with ID: {id}");
@@ -239,14 +281,17 @@ public class ImpactFunctions
     }
 
     [Function("UpdateImpact")]
+    [JwtAuth]
     public async Task<HttpResponseData> UpdateImpact(
         [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "impacts/{id}")] HttpRequestData req,
-        int id)
+        int id,
+        FunctionContext context)
     {
         _logger.LogInformation($"Updating Impact with ID: {id}");
 
         try
         {
+            var authInfo = req.ValidateJwtIfRequired(context);
             var existingImpact = await _context.Impacts
                 .Include(i => i.ImpactSdgs)
                 .FirstOrDefaultAsync(i => i.Id == id);
@@ -311,6 +356,11 @@ public class ImpactFunctions
             
             await response.WriteStringAsync(JsonSerializer.Serialize(updatedImpact, _jsonOptions));
             return response;
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogWarning("Unauthorized access attempt: {Message}", ex.Message);
+            return req.CreateUnauthorizedResponse(ex.Message);
         }
         catch (Exception ex)
         {
