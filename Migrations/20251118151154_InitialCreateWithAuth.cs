@@ -9,26 +9,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace sustainability_canvas_api.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialCreate : Migration
+    public partial class InitialCreateWithAuth : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.CreateTable(
-                name: "Profiles",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "integer", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    Name = table.Column<string>(type: "text", nullable: false),
-                    Email = table.Column<string>(type: "text", nullable: false),
-                    ProfileUrl = table.Column<string>(type: "text", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Profiles", x => x.Id);
-                });
-
             migrationBuilder.CreateTable(
                 name: "Sdgs",
                 columns: table => new
@@ -40,6 +25,43 @@ namespace sustainability_canvas_api.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Sdgs", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Users",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    Username = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    PasswordHash = table.Column<string>(type: "text", nullable: false),
+                    Role = table.Column<int>(type: "integer", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Users", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Profiles",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    Name = table.Column<string>(type: "text", nullable: false),
+                    Email = table.Column<string>(type: "text", nullable: false),
+                    ProfileUrl = table.Column<string>(type: "text", nullable: true),
+                    UserId = table.Column<int>(type: "integer", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Profiles", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Profiles_Users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -105,6 +127,12 @@ namespace sustainability_canvas_api.Migrations
                 {
                     table.PrimaryKey("PK_ProjectCollaborators", x => x.Id);
                     table.ForeignKey(
+                        name: "FK_ProjectCollaborators_Profiles_ProfileId",
+                        column: x => x.ProfileId,
+                        principalTable: "Profiles",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
                         name: "FK_ProjectCollaborators_Projects_ProjectId",
                         column: x => x.ProjectId,
                         principalTable: "Projects",
@@ -126,6 +154,12 @@ namespace sustainability_canvas_api.Migrations
                         name: "FK_ImpactSdgs_Impacts_ImpactId",
                         column: x => x.ImpactId,
                         principalTable: "Impacts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_ImpactSdgs_Sdgs_SdgId",
+                        column: x => x.SdgId,
+                        principalTable: "Sdgs",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -160,6 +194,22 @@ namespace sustainability_canvas_api.Migrations
                 column: "ProjectId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_ImpactSdgs_SdgId",
+                table: "ImpactSdgs",
+                column: "SdgId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Profiles_UserId",
+                table: "Profiles",
+                column: "UserId",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ProjectCollaborators_ProfileId",
+                table: "ProjectCollaborators",
+                column: "ProfileId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_ProjectCollaborators_ProjectId",
                 table: "ProjectCollaborators",
                 column: "ProjectId");
@@ -168,6 +218,12 @@ namespace sustainability_canvas_api.Migrations
                 name: "IX_Projects_ProfileId",
                 table: "Projects",
                 column: "ProfileId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Users_Username",
+                table: "Users",
+                column: "Username",
+                unique: true);
         }
 
         /// <inheritdoc />
@@ -180,16 +236,19 @@ namespace sustainability_canvas_api.Migrations
                 name: "ProjectCollaborators");
 
             migrationBuilder.DropTable(
-                name: "Sdgs");
+                name: "Impacts");
 
             migrationBuilder.DropTable(
-                name: "Impacts");
+                name: "Sdgs");
 
             migrationBuilder.DropTable(
                 name: "Projects");
 
             migrationBuilder.DropTable(
                 name: "Profiles");
+
+            migrationBuilder.DropTable(
+                name: "Users");
         }
     }
 }

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SustainabilityCanvas.Api.Data;
@@ -11,9 +12,11 @@ using SustainabilityCanvas.Api.Data;
 namespace sustainability_canvas_api.Migrations
 {
     [DbContext(typeof(SustainabilityCanvasContext))]
-    partial class SustainabilityCanvasContextModelSnapshot : ModelSnapshot
+    [Migration("20251118151154_InitialCreateWithAuth")]
+    partial class InitialCreateWithAuth
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -21,24 +24,6 @@ namespace sustainability_canvas_api.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
-
-            modelBuilder.Entity("SustainabilityCanvas.Api.Models.AppSetting", b =>
-                {
-                    b.Property<string>("Key")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Value")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Key");
-
-                    b.ToTable("AppSettings");
-                });
 
             modelBuilder.Entity("SustainabilityCanvas.Api.Models.Impact", b =>
                 {

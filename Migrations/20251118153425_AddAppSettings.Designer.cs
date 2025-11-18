@@ -12,8 +12,8 @@ using SustainabilityCanvas.Api.Data;
 namespace sustainability_canvas_api.Migrations
 {
     [DbContext(typeof(SustainabilityCanvasContext))]
-    [Migration("20251110142804_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20251118153425_AddAppSettings")]
+    partial class AddAppSettings
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -24,6 +24,24 @@ namespace sustainability_canvas_api.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+
+            modelBuilder.Entity("SustainabilityCanvas.Api.Models.AppSetting", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Key");
+
+                    b.ToTable("AppSettings");
+                });
 
             modelBuilder.Entity("SustainabilityCanvas.Api.Models.Impact", b =>
                 {
@@ -78,6 +96,8 @@ namespace sustainability_canvas_api.Migrations
 
                     b.HasKey("ImpactId", "SdgId");
 
+                    b.HasIndex("SdgId");
+
                     b.ToTable("ImpactSdgs");
                 });
 
@@ -100,7 +120,13 @@ namespace sustainability_canvas_api.Migrations
                     b.Property<string>("ProfileUrl")
                         .HasColumnType("text");
 
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
 
                     b.ToTable("Profiles");
                 });
@@ -156,6 +182,8 @@ namespace sustainability_canvas_api.Migrations
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ProfileId");
 
                     b.HasIndex("ProjectId");
 
@@ -267,6 +295,34 @@ namespace sustainability_canvas_api.Migrations
                         });
                 });
 
+            modelBuilder.Entity("SustainabilityCanvas.Api.Models.User", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("Role")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Username")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Username")
+                        .IsUnique();
+
+                    b.ToTable("Users");
+                });
+
             modelBuilder.Entity("SustainabilityCanvas.Api.Models.Impact", b =>
                 {
                     b.HasOne("SustainabilityCanvas.Api.Models.Project", null)
@@ -278,11 +334,32 @@ namespace sustainability_canvas_api.Migrations
 
             modelBuilder.Entity("SustainabilityCanvas.Api.Models.ImpactSdg", b =>
                 {
-                    b.HasOne("SustainabilityCanvas.Api.Models.Impact", null)
-                        .WithMany()
+                    b.HasOne("SustainabilityCanvas.Api.Models.Impact", "Impact")
+                        .WithMany("ImpactSdgs")
                         .HasForeignKey("ImpactId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.HasOne("SustainabilityCanvas.Api.Models.Sdg", "Sdg")
+                        .WithMany()
+                        .HasForeignKey("SdgId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Impact");
+
+                    b.Navigation("Sdg");
+                });
+
+            modelBuilder.Entity("SustainabilityCanvas.Api.Models.Profile", b =>
+                {
+                    b.HasOne("SustainabilityCanvas.Api.Models.User", "User")
+                        .WithOne("Profile")
+                        .HasForeignKey("SustainabilityCanvas.Api.Models.Profile", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("SustainabilityCanvas.Api.Models.Project", b =>
@@ -296,10 +373,31 @@ namespace sustainability_canvas_api.Migrations
 
             modelBuilder.Entity("SustainabilityCanvas.Api.Models.ProjectCollaborator", b =>
                 {
-                    b.HasOne("SustainabilityCanvas.Api.Models.Project", null)
+                    b.HasOne("SustainabilityCanvas.Api.Models.Profile", "Profile")
+                        .WithMany()
+                        .HasForeignKey("ProfileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SustainabilityCanvas.Api.Models.Project", "Project")
                         .WithMany()
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Profile");
+
+                    b.Navigation("Project");
+                });
+
+            modelBuilder.Entity("SustainabilityCanvas.Api.Models.Impact", b =>
+                {
+                    b.Navigation("ImpactSdgs");
+                });
+
+            modelBuilder.Entity("SustainabilityCanvas.Api.Models.User", b =>
+                {
+                    b.Navigation("Profile")
                         .IsRequired();
                 });
 #pragma warning restore 612, 618
