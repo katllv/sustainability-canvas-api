@@ -18,7 +18,7 @@ public class JwtService
         _secretKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY") ?? "your-super-secret-key-that-should-be-at-least-32-characters-long";
         _issuer = Environment.GetEnvironmentVariable("JWT_ISSUER") ?? "sustainability-canvas-api";
         _audience = Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? "sustainability-canvas-client";
-        _expirationHours = int.Parse(Environment.GetEnvironmentVariable("JWT_EXPIRATION_HOURS") ?? "24");
+        _expirationHours = int.Parse(Environment.GetEnvironmentVariable("JWT_EXPIRATION_HOURS") ?? "2");
     }
 
     public string GenerateToken(int userId, string username, string role)
