@@ -21,4 +21,6 @@ public class Project
 
     public DateTime? UpdatedAt { get; set; } = DateTime.UtcNow;
 
+    // Navigation property
+    public ICollection<ProjectCollaborator> ProjectCollaborators { get; set; } = new List<ProjectCollaborator>();
 }

@@ -15,9 +15,10 @@ public class CreateImpactRequest
 {
     public int ProjectId { get; set; }
     public SectionType Type { get; set; }
-    public ImpactRating Level { get; set; }
+    public int Score { get; set; }
     public SustainabilityDimension Dimension { get; set; }
     public RelationType Relation { get; set; }
+    public string Title { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public List<int> SdgIds { get; set; } = new();
 }
@@ -189,9 +190,10 @@ public class ImpactFunctions
             {
                 ProjectId = impactRequest.ProjectId,
                 Type = impactRequest.Type,
-                Level = impactRequest.Level,
+                Score = impactRequest.Score,
                 Dimension = impactRequest.Dimension,
                 Relation = impactRequest.Relation,
+                Title = impactRequest.Title,
                 Description = impactRequest.Description,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
@@ -226,7 +228,7 @@ public class ImpactFunctions
         }
         catch (UnauthorizedAccessException ex)
         {
-            _logger.LogWarning("Unauthorized access attempt: {Message}", ex.Message);
+            _logger.LogWarning("UnauthForized access attempt: {Message}", ex.Message);
             return req.CreateUnauthorizedResponse(ex.Message);
         }
         catch (Exception ex)
@@ -323,9 +325,10 @@ public class ImpactFunctions
             // Update Impact fields
             existingImpact.ProjectId = updateRequest.ProjectId;
             existingImpact.Type = updateRequest.Type;
-            existingImpact.Level = updateRequest.Level;
+            existingImpact.Score = updateRequest.Score;
             existingImpact.Dimension = updateRequest.Dimension;
             existingImpact.Relation = updateRequest.Relation;
+            existingImpact.Title = updateRequest.Title;
             existingImpact.Description = updateRequest.Description;
             existingImpact.UpdatedAt = DateTime.UtcNow;
 

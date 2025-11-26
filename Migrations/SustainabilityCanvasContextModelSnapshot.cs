@@ -59,14 +59,19 @@ namespace sustainability_canvas_api.Migrations
                     b.Property<int>("Dimension")
                         .HasColumnType("integer");
 
-                    b.Property<int>("Level")
-                        .HasColumnType("integer");
-
                     b.Property<int>("ProjectId")
                         .HasColumnType("integer");
 
                     b.Property<int>("Relation")
                         .HasColumnType("integer");
+
+                    b.Property<int>("Score")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.Property<int>("Type")
                         .HasColumnType("integer");
@@ -370,7 +375,7 @@ namespace sustainability_canvas_api.Migrations
                         .IsRequired();
 
                     b.HasOne("SustainabilityCanvas.Api.Models.Project", "Project")
-                        .WithMany()
+                        .WithMany("ProjectCollaborators")
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -383,6 +388,11 @@ namespace sustainability_canvas_api.Migrations
             modelBuilder.Entity("SustainabilityCanvas.Api.Models.Impact", b =>
                 {
                     b.Navigation("ImpactSdgs");
+                });
+
+            modelBuilder.Entity("SustainabilityCanvas.Api.Models.Project", b =>
+                {
+                    b.Navigation("ProjectCollaborators");
                 });
 
             modelBuilder.Entity("SustainabilityCanvas.Api.Models.User", b =>

@@ -12,8 +12,8 @@ using SustainabilityCanvas.Api.Data;
 namespace sustainability_canvas_api.Migrations
 {
     [DbContext(typeof(SustainabilityCanvasContext))]
-    [Migration("20251118153425_AddAppSettings")]
-    partial class AddAppSettings
+    [Migration("20251126185056_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -62,14 +62,19 @@ namespace sustainability_canvas_api.Migrations
                     b.Property<int>("Dimension")
                         .HasColumnType("integer");
 
-                    b.Property<int>("Level")
-                        .HasColumnType("integer");
-
                     b.Property<int>("ProjectId")
                         .HasColumnType("integer");
 
                     b.Property<int>("Relation")
                         .HasColumnType("integer");
+
+                    b.Property<int>("Score")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.Property<int>("Type")
                         .HasColumnType("integer");
@@ -108,10 +113,6 @@ namespace sustainability_canvas_api.Migrations
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Email")
-                        .IsRequired()
-                        .HasColumnType("text");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -176,9 +177,6 @@ namespace sustainability_canvas_api.Migrations
                         .HasColumnType("integer");
 
                     b.Property<int>("ProjectId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("Role")
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
@@ -303,6 +301,11 @@ namespace sustainability_canvas_api.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasColumnType("text");
@@ -310,14 +313,9 @@ namespace sustainability_canvas_api.Migrations
                     b.Property<int>("Role")
                         .HasColumnType("integer");
 
-                    b.Property<string>("Username")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
                     b.HasKey("Id");
 
-                    b.HasIndex("Username")
+                    b.HasIndex("Email")
                         .IsUnique();
 
                     b.ToTable("Users");
@@ -380,7 +378,7 @@ namespace sustainability_canvas_api.Migrations
                         .IsRequired();
 
                     b.HasOne("SustainabilityCanvas.Api.Models.Project", "Project")
-                        .WithMany()
+                        .WithMany("ProjectCollaborators")
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -393,6 +391,11 @@ namespace sustainability_canvas_api.Migrations
             modelBuilder.Entity("SustainabilityCanvas.Api.Models.Impact", b =>
                 {
                     b.Navigation("ImpactSdgs");
+                });
+
+            modelBuilder.Entity("SustainabilityCanvas.Api.Models.Project", b =>
+                {
+                    b.Navigation("ProjectCollaborators");
                 });
 
             modelBuilder.Entity("SustainabilityCanvas.Api.Models.User", b =>

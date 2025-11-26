@@ -280,4 +280,91 @@ public class ProjectFunctions
             return errorResponse;
         }
     }
+
+    [Function("GetUserProjectsWithCollaborators")]
+    [JwtAuth]
+    public async Task<HttpResponseData> GetUserProjectsWithCollaborators(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "profiles/{profileId}/projects-full")] HttpRequestData req,
+        int profileId,
+        FunctionContext context)
+    {
+        _logger.LogInformation($"Getting all projects with collaborators for profile ID: {profileId}");
+
+        try
+        {
+            var authInfo = req.ValidateJwtIfRequired(context);
+
+            // Get projects owned by user
+            var ownedProjects = await _context.Projects
+                .Where(p => p.ProfileId == profileId)
+                .Include(p => p.ProjectCollaborators)
+                    .ThenInclude(pc => pc.Profile)
+                .ToListAsync();
+
+            // Get projects where user is a collaborator
+            var collaboratedProjectIds = await _context.ProjectCollaborators
+                .Where(pc => pc.ProfileId == profileId)
+                .Select(pc => pc.ProjectId)
+                .ToListAsync();
+
+            var collaboratedProjects = await _context.Projects
+                .Where(p => collaboratedProjectIds.Contains(p.Id))
+                .Include(p => p.ProjectCollaborators)
+                    .ThenInclude(pc => pc.Profile)
+                .ToListAsync();
+
+            // Combine and deduplicate
+            var allProjects = ownedProjects
+                .Concat(collaboratedProjects)
+                .GroupBy(p => p.Id)
+                .Select(g => g.First())
+                .ToList();
+
+            // Transform to include owner and collaborators in a simplified format
+            var projectsWithCollaborators = allProjects.Select(p => new
+            {
+                p.Id,
+                p.ProfileId,
+                p.Title,
+                p.Description,
+                p.CreatedAt,
+                p.UpdatedAt,
+                Collaborators = new[]
+                {
+                    // Get the owner profile
+                    _context.Profiles
+                        .Where(profile => profile.Id == p.ProfileId)
+                        .Select(profile => new { profile.Name, profile.ProfileUrl })
+                        .FirstOrDefault()
+                }
+                .Concat(
+                    // Get all collaborators
+                    p.ProjectCollaborators
+                        .Select(pc => new { pc.Profile.Name, pc.Profile.ProfileUrl })
+                )
+                .Where(c => c != null)
+                .Distinct()
+                .ToList()
+            }).ToList();
+
+            var response = req.CreateResponse(HttpStatusCode.OK);
+            response.Headers.Add("Content-Type", "application/json; charset=utf-8");
+
+            await response.WriteStringAsync(JsonSerializer.Serialize(projectsWithCollaborators, _jsonOptions));
+            return response;
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogWarning("Unauthorized access attempt: {Message}", ex.Message);
+            return req.CreateUnauthorizedResponse(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, $"Error getting projects for profile ID: {profileId}");
+
+            var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
+            await errorResponse.WriteStringAsync("An error occurred while getting user projects");
+            return errorResponse;
+        }
+    }
 }

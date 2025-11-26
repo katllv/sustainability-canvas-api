@@ -40,7 +40,8 @@ var host = new HostBuilder()
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
                 PropertyNameCaseInsensitive = true,
                 ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles,
-                WriteIndented = false // Set to true for debugging if needed
+                WriteIndented = false, // Set to true for debugging if needed
+                Converters = { new JsonStringEnumConverter() }  // Add this line
             };
         });
     })

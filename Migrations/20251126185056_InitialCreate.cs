@@ -9,11 +9,24 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace sustainability_canvas_api.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialCreateWithAuth : Migration
+    public partial class InitialCreate : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.CreateTable(
+                name: "AppSettings",
+                columns: table => new
+                {
+                    Key = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    Value = table.Column<string>(type: "text", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_AppSettings", x => x.Key);
+                });
+
             migrationBuilder.CreateTable(
                 name: "Sdgs",
                 columns: table => new
@@ -33,7 +46,7 @@ namespace sustainability_canvas_api.Migrations
                 {
                     Id = table.Column<int>(type: "integer", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    Username = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    Email = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     PasswordHash = table.Column<string>(type: "text", nullable: false),
                     Role = table.Column<int>(type: "integer", nullable: false)
                 },
@@ -49,7 +62,6 @@ namespace sustainability_canvas_api.Migrations
                     Id = table.Column<int>(type: "integer", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     Name = table.Column<string>(type: "text", nullable: false),
-                    Email = table.Column<string>(type: "text", nullable: false),
                     ProfileUrl = table.Column<string>(type: "text", nullable: true),
                     UserId = table.Column<int>(type: "integer", nullable: false)
                 },
@@ -95,9 +107,10 @@ namespace sustainability_canvas_api.Migrations
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     ProjectId = table.Column<int>(type: "integer", nullable: false),
                     Type = table.Column<int>(type: "integer", nullable: false),
-                    Level = table.Column<int>(type: "integer", nullable: false),
+                    Score = table.Column<int>(type: "integer", nullable: false),
                     Dimension = table.Column<int>(type: "integer", nullable: false),
                     Relation = table.Column<int>(type: "integer", nullable: false),
+                    Title = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     Description = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
@@ -120,8 +133,7 @@ namespace sustainability_canvas_api.Migrations
                     Id = table.Column<int>(type: "integer", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     ProfileId = table.Column<int>(type: "integer", nullable: false),
-                    ProjectId = table.Column<int>(type: "integer", nullable: false),
-                    Role = table.Column<int>(type: "integer", nullable: false)
+                    ProjectId = table.Column<int>(type: "integer", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -220,15 +232,18 @@ namespace sustainability_canvas_api.Migrations
                 column: "ProfileId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Users_Username",
+                name: "IX_Users_Email",
                 table: "Users",
-                column: "Username",
+                column: "Email",
                 unique: true);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropTable(
+                name: "AppSettings");
+
             migrationBuilder.DropTable(
                 name: "ImpactSdgs");
 

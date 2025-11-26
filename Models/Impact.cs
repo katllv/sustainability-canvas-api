@@ -17,13 +17,6 @@ public enum SectionType
     GO
 }
 
-public enum ImpactRating
-{
-    Positive,
-    Neutral,
-    Negative
-}
-
 public enum SustainabilityDimension
 {
     Environmental,
@@ -50,15 +43,19 @@ public class Impact
     public SectionType Type { get; set; }
 
     [Required]
-    public ImpactRating Level { get; set; }
+    [Range(1, 10)]
+    public int Score { get; set; }
 
     [Required]
     public SustainabilityDimension Dimension { get; set; }
 
     [Required]
     public RelationType Relation { get; set; }
-
+    
     [Required]
+    [MaxLength(200)]
+    public string Title { get; set; } = string.Empty;
+    
     [MaxLength(2000)]
     public string Description { get; set; } = string.Empty;
 

@@ -48,7 +48,7 @@ public class SustainabilityCanvasContext : DbContext
         // Configure ProjectCollaborator relationships with navigation properties
         modelBuilder.Entity<ProjectCollaborator>()
             .HasOne(pc => pc.Project)
-            .WithMany()
+            .WithMany(p => p.ProjectCollaborators)
             .HasForeignKey(pc => pc.ProjectId)
             .OnDelete(DeleteBehavior.Cascade);
 
