@@ -21,7 +21,7 @@ public class JwtService
         _expirationHours = int.Parse(Environment.GetEnvironmentVariable("JWT_EXPIRATION_HOURS") ?? "2");
     }
 
-    public string GenerateToken(int userId, string username, string role)
+    public string GenerateToken(int userId, string email, string role)
     {
         var tokenHandler = new JwtSecurityTokenHandler();
         var key = Encoding.ASCII.GetBytes(_secretKey);
@@ -29,10 +29,9 @@ public class JwtService
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, userId.ToString()),
-            new(ClaimTypes.Name, username),
+            new(ClaimTypes.Email, email),
             new(ClaimTypes.Role, role),
-            new("userId", userId.ToString()),
-            new("username", username)
+            new("userId", userId.ToString())
         };
 
         var tokenDescriptor = new SecurityTokenDescriptor
@@ -87,10 +86,10 @@ public class JwtService
         return principal?.FindFirst("userId")?.Value;
     }
 
-    public string? GetUsernameFromToken(string token)
+    public string? GetEmailFromToken(string token)
     {
         var principal = ValidateToken(token);
-        return principal?.FindFirst("username")?.Value;
+        return principal?.FindFirst(ClaimTypes.Email)?.Value;
     }
 
     public string? GetRoleFromToken(string token)

@@ -124,7 +124,6 @@ public class ProfileFunctions
 
             // Update profile properties
             profile.Name = updatedProfile.Name;
-            profile.Email = updatedProfile.Email;
             profile.ProfileUrl = updatedProfile.ProfileUrl;
 
             await _context.SaveChangesAsync();

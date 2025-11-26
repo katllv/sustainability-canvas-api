@@ -66,11 +66,11 @@ public class SustainabilityCanvasContext : DbContext
             .HasForeignKey(p => p.ProfileId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // Unique Username
+        // Unique Email
         modelBuilder.Entity<User>(entity =>
         {
-            entity.HasIndex(u => u.Username).IsUnique();
-            entity.Property(u => u.Username).HasMaxLength(50);
+            entity.HasIndex(u => u.Email).IsUnique();
+            entity.Property(u => u.Email).HasMaxLength(100);
         });
 
         // One-to-one User-Profile relationship, delete Profile if User is deleted

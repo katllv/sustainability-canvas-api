@@ -14,25 +14,23 @@ namespace SustainabilityCanvas.Api.Functions;
 
 public class RegisterRequest
 {
-    public string Username { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
-    public string Email { get; set; } = string.Empty;
     public string RegistrationCode { get; set; } = string.Empty;
 }
 
 public class LoginRequest
 {
-    public string Username { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
 }
 
 public class CreateAdminRequest
 {
-    public string Username { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
-    public string Email { get; set; } = string.Empty;
     public string MasterPassword { get; set; } = string.Empty;
 }
 
@@ -83,10 +81,10 @@ public class UserFunctions
 
             var registerRequest = JsonSerializer.Deserialize<RegisterRequest>(requestBody, _jsonOptions);
             
-            if (registerRequest == null || string.IsNullOrEmpty(registerRequest.Username) || string.IsNullOrEmpty(registerRequest.Password) || string.IsNullOrEmpty(registerRequest.RegistrationCode))
+            if (registerRequest == null || string.IsNullOrEmpty(registerRequest.Email) || string.IsNullOrEmpty(registerRequest.Password) || string.IsNullOrEmpty(registerRequest.RegistrationCode))
             {
                 var badRequest = req.CreateResponse(HttpStatusCode.BadRequest);
-                await badRequest.WriteStringAsync("Username, password, and registration code are required");
+                await badRequest.WriteStringAsync("Email, password, and registration code are required");
                 return badRequest;
             }
 
@@ -98,19 +96,19 @@ public class UserFunctions
                 return unauthorized;
             }
 
-            // Check if username already exists
-            var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Username == registerRequest.Username);
+            // Check if email already exists
+            var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == registerRequest.Email);
             if (existingUser != null)
             {
                 var conflict = req.CreateResponse(HttpStatusCode.Conflict);
-                await conflict.WriteStringAsync("Username already exists");
+                await conflict.WriteStringAsync("Email already exists");
                 return conflict;
             }
 
             // Create user with hashed password
             var user = new User
             {
-                Username = registerRequest.Username,
+                Email = registerRequest.Email,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(registerRequest.Password),
                 Role = UserRole.User
             };
@@ -122,15 +120,14 @@ public class UserFunctions
             var profile = new Profile
             {
                 UserId = user.Id,
-                Name = registerRequest.Name,
-                Email = registerRequest.Email
+                Name = registerRequest.Name
             };
 
             _context.Profiles.Add(profile);
             await _context.SaveChangesAsync();
 
             // Generate JWT token
-            var token = _jwtService.GenerateToken(user.Id, user.Username, user.Role.ToString());
+            var token = _jwtService.GenerateToken(user.Id, user.Email, user.Role.ToString());
 
             var response = req.CreateResponse(HttpStatusCode.Created);
             response.Headers.Add("Content-Type", "application/json; charset=utf-8");
@@ -138,14 +135,13 @@ public class UserFunctions
             var responseData = new
             {
                 user.Id,
-                user.Username,
+                user.Email,
                 user.Role,
                 Token = token,
                 Profile = new
                 {
                     profile.Id,
-                    profile.Name,
-                    profile.Email
+                    profile.Name
                 }
             };
 
@@ -179,22 +175,22 @@ public class UserFunctions
 
             var loginRequest = JsonSerializer.Deserialize<LoginRequest>(requestBody, _jsonOptions);
             
-            if (loginRequest == null || string.IsNullOrEmpty(loginRequest.Username) || string.IsNullOrEmpty(loginRequest.Password))
+            if (loginRequest == null || string.IsNullOrEmpty(loginRequest.Email) || string.IsNullOrEmpty(loginRequest.Password))
             {
                 var badRequest = req.CreateResponse(HttpStatusCode.BadRequest);
-                await badRequest.WriteStringAsync("Username and password are required");
+                await badRequest.WriteStringAsync("Email and password are required");
                 return badRequest;
             }
 
             // Find user with profile
             var user = await _context.Users
                 .Include(u => u.Profile)
-                .FirstOrDefaultAsync(u => u.Username == loginRequest.Username);
+                .FirstOrDefaultAsync(u => u.Email == loginRequest.Email);
 
             if (user == null)
             {
                 var unauthorized = req.CreateResponse(HttpStatusCode.Unauthorized);
-                await unauthorized.WriteStringAsync("Invalid username or password");
+                await unauthorized.WriteStringAsync("Invalid email or password");
                 return unauthorized;
             }
 
@@ -204,12 +200,12 @@ public class UserFunctions
             if (!isPasswordValid)
             {
                 var unauthorized = req.CreateResponse(HttpStatusCode.Unauthorized);
-                await unauthorized.WriteStringAsync("Invalid username or password");
+                await unauthorized.WriteStringAsync("Invalid email or password");
                 return unauthorized;
             }
 
             // Generate JWT token
-            var token = _jwtService.GenerateToken(user.Id, user.Username, user.Role.ToString());
+            var token = _jwtService.GenerateToken(user.Id, user.Email, user.Role.ToString());
             
             var response = req.CreateResponse(HttpStatusCode.OK);
             response.Headers.Add("Content-Type", "application/json; charset=utf-8");
@@ -221,13 +217,12 @@ public class UserFunctions
                 user = new
                 {
                     user.Id,
-                    user.Username,
+                    user.Email,
                     user.Role,
                     Profile = user.Profile != null ? new
                     {
                         user.Profile.Id,
-                        user.Profile.Name,
-                        user.Profile.Email
+                        user.Profile.Name
                     } : null
                 }
             };
@@ -263,13 +258,12 @@ public class UserFunctions
                 .Select(u => new
                 {
                     u.Id,
-                    u.Username,
+                    u.Email,
                     u.Role,
                     Profile = u.Profile != null ? new
                     {
                         u.Profile.Id,
-                        u.Profile.Name,
-                        u.Profile.Email
+                        u.Profile.Name
                     } : null
                 })
                 .ToListAsync();
@@ -356,11 +350,11 @@ public class UserFunctions
 
             var createAdminRequest = JsonSerializer.Deserialize<CreateAdminRequest>(requestBody, _jsonOptions);
             
-            if (createAdminRequest == null || string.IsNullOrEmpty(createAdminRequest.Username) || 
+            if (createAdminRequest == null || string.IsNullOrEmpty(createAdminRequest.Email) || 
                 string.IsNullOrEmpty(createAdminRequest.Password) || string.IsNullOrEmpty(createAdminRequest.MasterPassword))
             {
                 var badRequest = req.CreateResponse(HttpStatusCode.BadRequest);
-                await badRequest.WriteStringAsync("Username, password, and master password are required");
+                await badRequest.WriteStringAsync("Email, password, and master password are required");
                 return badRequest;
             }
 
@@ -373,18 +367,18 @@ public class UserFunctions
             }
 
             // Check if user already exists
-            var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Username == createAdminRequest.Username);
+            var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == createAdminRequest.Email);
             if (existingUser != null)
             {
                 var conflict = req.CreateResponse(HttpStatusCode.Conflict);
-                await conflict.WriteStringAsync("User with this username already exists");
+                await conflict.WriteStringAsync("User with this email already exists");
                 return conflict;
             }
 
             // Create admin user
             var adminUser = new User
             {
-                Username = createAdminRequest.Username,
+                Email = createAdminRequest.Email,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(createAdminRequest.Password),
                 Role = UserRole.Admin
             };
@@ -396,15 +390,14 @@ public class UserFunctions
             var profile = new Profile
             {
                 UserId = adminUser.Id,
-                Name = createAdminRequest.Name,
-                Email = createAdminRequest.Email
+                Name = createAdminRequest.Name
             };
 
             _context.Profiles.Add(profile);
             await _context.SaveChangesAsync();
 
             // Generate JWT token for admin user
-            var token = _jwtService.GenerateToken(adminUser.Id, adminUser.Username, adminUser.Role.ToString());
+            var token = _jwtService.GenerateToken(adminUser.Id, adminUser.Email, adminUser.Role.ToString());
 
             var response = req.CreateResponse(HttpStatusCode.Created);
             response.Headers.Add("Content-Type", "application/json; charset=utf-8");
@@ -412,14 +405,13 @@ public class UserFunctions
             var responseData = new
             {
                 adminUser.Id,
-                adminUser.Username,
+                adminUser.Email,
                 adminUser.Role,
                 Token = token,
                 Profile = new
                 {
                     profile.Id,
-                    profile.Name,
-                    profile.Email
+                    profile.Name
                 }
             };
 

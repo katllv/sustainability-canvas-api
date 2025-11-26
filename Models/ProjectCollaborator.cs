@@ -2,13 +2,6 @@ using System.ComponentModel.DataAnnotations;
 
 namespace SustainabilityCanvas.Api.Models;
 
-public enum CollaboratorRole
-{
-    Owner,
-    Editor, 
-    Viewer
-}
-
 public class ProjectCollaborator
 {
     [Key]
@@ -19,9 +12,6 @@ public class ProjectCollaborator
 
     [Required]
     public int ProjectId { get; set; }  // FK to Project
-
-    [Required]
-    public CollaboratorRole Role { get; set; } = CollaboratorRole.Viewer;
 
     // to get associated Profile and Project
     public Profile Profile { get; set; } = null!;

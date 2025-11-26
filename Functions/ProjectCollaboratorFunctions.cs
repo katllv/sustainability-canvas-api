@@ -13,9 +13,7 @@ namespace SustainabilityCanvas.Api.Functions;
 
 public class CreateCollaboratorRequest
 {
-    public int ProfileId { get; set; }
-    public int ProjectId { get; set; }
-    public CollaboratorRole Role { get; set; } = CollaboratorRole.Viewer;
+    public string Email { get; set; } = string.Empty;
 }
 
 public class ProjectCollaboratorFunctions
@@ -91,10 +89,10 @@ public class ProjectCollaboratorFunctions
             }
 
             var collaboratorRequest = JsonSerializer.Deserialize<CreateCollaboratorRequest>(requestBody, _jsonOptions);
-            if (collaboratorRequest == null)
+            if (collaboratorRequest == null || string.IsNullOrEmpty(collaboratorRequest.Email))
             {
                 var badRequestResponse = req.CreateResponse(HttpStatusCode.BadRequest);
-                await badRequestResponse.WriteStringAsync("Invalid collaborator data");
+                await badRequestResponse.WriteStringAsync("Email is required");
                 return badRequestResponse;
             }
 
@@ -107,18 +105,21 @@ public class ProjectCollaboratorFunctions
                 return notFoundResponse;
             }
 
-            // Check if profile exists
-            var profile = await _context.Profiles.FindAsync(collaboratorRequest.ProfileId);
-            if (profile == null)
+            // Find user by email
+            var user = await _context.Users
+                .Include(u => u.Profile)
+                .FirstOrDefaultAsync(u => u.Email == collaboratorRequest.Email);
+            
+            if (user == null || user.Profile == null)
             {
                 var notFoundResponse = req.CreateResponse(HttpStatusCode.NotFound);
-                await notFoundResponse.WriteStringAsync($"Profile with ID {collaboratorRequest.ProfileId} not found");
+                await notFoundResponse.WriteStringAsync($"User with email {collaboratorRequest.Email} not found");
                 return notFoundResponse;
             }
 
             // Check if collaboration already exists
             var existingCollaborator = await _context.ProjectCollaborators
-                .FirstOrDefaultAsync(pc => pc.ProjectId == projectId && pc.ProfileId == collaboratorRequest.ProfileId);
+                .FirstOrDefaultAsync(pc => pc.ProjectId == projectId && pc.ProfileId == user.Profile.Id);
 
             if (existingCollaborator != null)
             {
@@ -131,8 +132,7 @@ public class ProjectCollaboratorFunctions
             var collaborator = new ProjectCollaborator
             {
                 ProjectId = projectId,
-                ProfileId = collaboratorRequest.ProfileId,
-                Role = collaboratorRequest.Role
+                ProfileId = user.Profile.Id
             };
 
             _context.ProjectCollaborators.Add(collaborator);
@@ -160,71 +160,6 @@ public class ProjectCollaboratorFunctions
 
             var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
             await errorResponse.WriteStringAsync("An error occurred while adding collaborator");
-            return errorResponse;
-        }
-    }
-
-    [Function("UpdateCollaboratorRole")]
-    [JwtAuth]
-    public async Task<HttpResponseData> UpdateCollaboratorRole(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "collaborators/{collaboratorId}")] HttpRequestData req,
-        int collaboratorId,
-        FunctionContext context)
-    {
-        _logger.LogInformation($"Updating collaborator ID: {collaboratorId}");
-
-        try
-        {
-            var authInfo = req.ValidateJwtIfRequired(context);
-            var existingCollaborator = await _context.ProjectCollaborators
-                .Include(pc => pc.Profile)
-                .FirstOrDefaultAsync(pc => pc.Id == collaboratorId);
-
-            if (existingCollaborator == null)
-            {
-                var notFoundResponse = req.CreateResponse(HttpStatusCode.NotFound);
-                await notFoundResponse.WriteStringAsync($"Collaborator with ID {collaboratorId} not found");
-                return notFoundResponse;
-            }
-
-            var requestBody = await req.ReadAsStringAsync();
-
-            if (string.IsNullOrEmpty(requestBody))
-            {
-                var badRequestResponse = req.CreateResponse(HttpStatusCode.BadRequest);
-                await badRequestResponse.WriteStringAsync("Request body is empty");
-                return badRequestResponse;
-            }
-
-            var updateRequest = JsonSerializer.Deserialize<CreateCollaboratorRequest>(requestBody, _jsonOptions);
-            if (updateRequest == null)
-            {
-                var badRequestResponse = req.CreateResponse(HttpStatusCode.BadRequest);
-                await badRequestResponse.WriteStringAsync("Invalid collaborator data");
-                return badRequestResponse;
-            }
-
-            // Update role
-            existingCollaborator.Role = updateRequest.Role;
-            await _context.SaveChangesAsync();
-
-            var response = req.CreateResponse(HttpStatusCode.OK);
-            response.Headers.Add("Content-Type", "application/json; charset=utf-8");
-
-            await response.WriteStringAsync(JsonSerializer.Serialize(existingCollaborator, _jsonOptions));
-            return response;
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            _logger.LogWarning("Unauthorized access attempt: {Message}", ex.Message);
-            return req.CreateUnauthorizedResponse(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, $"Error updating collaborator ID: {collaboratorId}");
-
-            var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
-            await errorResponse.WriteStringAsync("An error occurred while updating collaborator");
             return errorResponse;
         }
     }

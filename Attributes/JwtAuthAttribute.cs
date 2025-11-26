@@ -32,7 +32,7 @@ namespace SustainabilityCanvas.Api.Attributes
         /// Returns null if no JWT validation is required for this function.
         /// Throws UnauthorizedAccessException if JWT validation fails.
         /// </summary>
-        public static (int UserId, string Username, bool IsAdmin)? ValidateJwtIfRequired(
+        public static (int UserId, string Email, bool IsAdmin)? ValidateJwtIfRequired(
             this HttpRequestData req, 
             FunctionContext context)
         {
@@ -78,10 +78,10 @@ namespace SustainabilityCanvas.Api.Attributes
 
                 // Extract user information
                 var userIdStr = jwtService.GetUserIdFromToken(token);
-                var username = jwtService.GetUsernameFromToken(token);
+                var email = jwtService.GetEmailFromToken(token);
                 var isAdmin = jwtService.IsAdmin(token);
 
-                if (string.IsNullOrEmpty(userIdStr) || string.IsNullOrEmpty(username))
+                if (string.IsNullOrEmpty(userIdStr) || string.IsNullOrEmpty(email))
                 {
                     throw new UnauthorizedAccessException("Invalid token claims");
                 }
@@ -97,7 +97,7 @@ namespace SustainabilityCanvas.Api.Attributes
                     throw new UnauthorizedAccessException("Admin access required");
                 }
 
-                return (userId, username, isAdmin);
+                return (userId, email, isAdmin);
             }
             catch (Exception ex) when (!(ex is UnauthorizedAccessException))
             {
