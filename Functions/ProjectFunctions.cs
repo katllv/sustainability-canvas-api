@@ -208,6 +208,16 @@ public class ProjectFunctions
             }
 
             var requestBody = await new StreamReader(req.Body).ReadToEndAsync();
+            
+            if (string.IsNullOrEmpty(requestBody))
+            {
+                var badRequestResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+                await badRequestResponse.WriteStringAsync("Request body is empty");
+                return badRequestResponse;
+            }
+
+            _logger.LogInformation($"Request body: {requestBody}");
+
             var updatedProject = JsonSerializer.Deserialize<Project>(requestBody, _jsonOptions);
 
             if (updatedProject == null)
@@ -217,10 +227,14 @@ public class ProjectFunctions
                 return badRequestResponse;
             }
 
-            // Update fields
-            existingProject.Title = updatedProject.Title;
+            // Update only the fields that are provided
+            if (!string.IsNullOrEmpty(updatedProject.Title))
+            {
+                existingProject.Title = updatedProject.Title;
+            }
+            
             existingProject.Description = updatedProject.Description;
-            existingProject.ProfileId = updatedProject.ProfileId;
+            existingProject.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
 
@@ -234,12 +248,19 @@ public class ProjectFunctions
             _logger.LogWarning("Unauthorized access attempt: {Message}", ex.Message);
             return req.CreateUnauthorizedResponse(ex.Message);
         }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex, $"JSON deserialization error for project ID: {id}");
+            var badRequestResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+            await badRequestResponse.WriteStringAsync($"Invalid JSON format: {ex.Message}");
+            return badRequestResponse;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, $"Error updating project with ID: {id}");
 
             var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
-            await errorResponse.WriteStringAsync("An error occurred while updating the project");
+            await errorResponse.WriteStringAsync($"An error occurred while updating the project: {ex.Message}");
             return errorResponse;
         }
     }

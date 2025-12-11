@@ -212,6 +212,14 @@ public class ImpactFunctions
                 };
                 _context.ImpactSdgs.Add(impactSdg);
             }
+
+            // Update project's UpdatedAt timestamp
+            var project = await _context.Projects.FindAsync(impactRequest.ProjectId);
+            if (project != null)
+            {
+                project.UpdatedAt = DateTime.UtcNow;
+            }
+
             await _context.SaveChangesAsync();
 
             // Return the created impact with SDG relationships
@@ -259,6 +267,13 @@ public class ImpactFunctions
                 var notFoundResponse = req.CreateResponse(HttpStatusCode.NotFound);
                 await notFoundResponse.WriteStringAsync($"Impact with ID: {id} not found");
                 return notFoundResponse;
+            }
+
+            // Update project's UpdatedAt timestamp
+            var project = await _context.Projects.FindAsync(impact.ProjectId);
+            if (project != null)
+            {
+                project.UpdatedAt = DateTime.UtcNow;
             }
 
             _context.Impacts.Remove(impact);
@@ -322,8 +337,7 @@ public class ImpactFunctions
                 return badRequestResponse;
             }
 
-            // Update Impact fields
-            existingImpact.ProjectId = updateRequest.ProjectId;
+            // Update Impact fields (don't update ProjectId - it shouldn't change)
             existingImpact.Type = updateRequest.Type;
             existingImpact.Score = updateRequest.Score;
             existingImpact.Dimension = updateRequest.Dimension;
@@ -344,6 +358,13 @@ public class ImpactFunctions
                     SdgId = sdgId
                 };
                 _context.ImpactSdgs.Add(impactSdg);
+            }
+
+            // Update project's UpdatedAt timestamp (use existing impact's ProjectId)
+            var project = await _context.Projects.FindAsync(existingImpact.ProjectId);
+            if (project != null)
+            {
+                project.UpdatedAt = DateTime.UtcNow;
             }
 
             await _context.SaveChangesAsync();
