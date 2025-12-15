@@ -435,16 +435,16 @@ public class ProjectFunctions
             }
 
             // Check if user has access to this project (is owner or collaborator)
-            var hasAccess = await _context.Projects
+            var project = await _context.Projects
                 .Where(p => p.Id == projectId)
                 .Where(p => p.ProfileId == profile.Id || 
                            p.ProjectCollaborators.Any(c => c.ProfileId == profile.Id))
-                .AnyAsync();
+                .FirstOrDefaultAsync();
 
-            if (!hasAccess)
+            if (project == null)
             {
                 var forbiddenResponse = req.CreateResponse(HttpStatusCode.Forbidden);
-                await forbiddenResponse.WriteStringAsync("You don't have access to this project");
+                await forbiddenResponse.WriteStringAsync("Project not found or you don't have access to this project");
                 return forbiddenResponse;
             }
 
@@ -464,6 +464,28 @@ public class ProjectFunctions
                 .Select(i => i.Dimension)
                 .Distinct()
                 .Count();
+            var positiveImpacts = impacts.Count(i => i.Score >= 4);
+            var negativeImpacts = impacts.Count(i => i.Score <= 2);
+            var neutralImpacts = impacts.Count(i => i.Score == 3);
+            var averageScore = impacts.Any() ? Math.Round(impacts.Average(i => i.Score), 2) : 0;
+
+            // Calculate score distribution (1-5)
+            var scoreDistribution = Enumerable.Range(1, 5)
+                .Select(score => new
+                {
+                    score,
+                    count = impacts.Count(i => i.Score == score)
+                })
+                .Where(x => x.count > 0)
+                .ToList();
+
+            // Calculate sentiment distribution
+            var sentimentDistribution = new[]
+            {
+                new { name = "Negative", value = negativeImpacts },
+                new { name = "Neutral", value = neutralImpacts },
+                new { name = "Positive", value = positiveImpacts }
+            }.Where(x => x.value > 0).ToList();
 
             // Calculate impact distribution by RelationType
             var impactDistribution = Enum.GetValues<RelationType>()
@@ -499,12 +521,20 @@ public class ProjectFunctions
 
             var analysisData = new
             {
+                projectId = project.Id,
+                projectTitle = project.Title,
                 summary = new
                 {
                     totalEntries,
                     sdgsCovered,
-                    activeDimensions
+                    activeDimensions,
+                    averageScore,
+                    positiveImpacts,
+                    negativeImpacts,
+                    neutralImpacts
                 },
+                scoreDistribution,
+                sentimentDistribution,
                 impactDistribution,
                 dimensionDistribution,
                 sdgCounts
