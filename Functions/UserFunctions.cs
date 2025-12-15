@@ -239,6 +239,109 @@ public class UserFunctions
         }
     }
 
+    [Function("UpdateUserEmail")]
+    [JwtAuth]
+    public async Task<HttpResponseData> UpdateUserEmail(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "users/email")] HttpRequestData req,
+        FunctionContext context)
+    {
+        _logger.LogInformation("Updating user email");
+
+        try
+        {
+            var authInfo = req.ValidateJwtIfRequired(context);
+            if (!authInfo.HasValue)
+            {
+                var unauthorizedResponse = req.CreateResponse(HttpStatusCode.Unauthorized);
+                await unauthorizedResponse.WriteStringAsync("Unauthorized");
+                return unauthorizedResponse;
+            }
+
+            var requestBody = await req.ReadAsStringAsync();
+
+            if (string.IsNullOrEmpty(requestBody))
+            {
+                var badRequestResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+                await badRequestResponse.WriteStringAsync("Request body is empty");
+                return badRequestResponse;
+            }
+
+            var updateRequest = JsonSerializer.Deserialize<Dictionary<string, string>>(requestBody, _jsonOptions);
+            if (updateRequest == null || !updateRequest.ContainsKey("email"))
+            {
+                var badRequestResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+                await badRequestResponse.WriteStringAsync("Email is required");
+                return badRequestResponse;
+            }
+
+            var newEmail = updateRequest["email"];
+
+            // Validate email format (basic check)
+            if (string.IsNullOrWhiteSpace(newEmail) || !newEmail.Contains("@"))
+            {
+                var badRequestResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+                await badRequestResponse.WriteStringAsync("Invalid email format");
+                return badRequestResponse;
+            }
+
+            // Check if email is already taken
+            var emailExists = await _context.Users.AnyAsync(u => u.Email == newEmail && u.Id != authInfo.Value.UserId);
+            if (emailExists)
+            {
+                var conflictResponse = req.CreateResponse(HttpStatusCode.Conflict);
+                await conflictResponse.WriteStringAsync("Email is already in use");
+                return conflictResponse;
+            }
+
+            // Get the user
+            var user = await _context.Users
+                .Include(u => u.Profile)
+                .FirstOrDefaultAsync(u => u.Id == authInfo.Value.UserId);
+
+            if (user == null)
+            {
+                var notFoundResponse = req.CreateResponse(HttpStatusCode.NotFound);
+                await notFoundResponse.WriteStringAsync("User not found");
+                return notFoundResponse;
+            }
+
+            // Update email
+            user.Email = newEmail;
+            await _context.SaveChangesAsync();
+
+            var response = req.CreateResponse(HttpStatusCode.OK);
+            response.Headers.Add("Content-Type", "application/json; charset=utf-8");
+
+            var responseData = new
+            {
+                user.Id,
+                user.Email,
+                user.Role,
+                Profile = user.Profile != null ? new
+                {
+                    user.Profile.Id,
+                    user.Profile.Name,
+                    user.Profile.ProfileUrl
+                } : null
+            };
+
+            await response.WriteStringAsync(JsonSerializer.Serialize(responseData, _jsonOptions));
+            return response;
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogWarning("Unauthorized access attempt: {Message}", ex.Message);
+            return req.CreateUnauthorizedResponse(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating user email");
+            var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
+            await errorResponse.WriteStringAsync("Failed to update email");
+            return errorResponse;
+        }
+    }
+
     // ADMIN FUNCTIONS
 
     [Function("GetAllUsers")]
