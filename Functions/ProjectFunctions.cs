@@ -315,6 +315,11 @@ public class ProjectFunctions
         {
             var authInfo = req.ValidateJwtIfRequired(context);
 
+            // Get all profiles with users for later use
+            var allProfiles = await _context.Profiles
+                .Include(p => p.User)
+                .ToDictionaryAsync(p => p.Id);
+
             // Get projects owned by user
             var ownedProjects = await _context.Projects
                 .Where(p => p.ProfileId == profileId)
@@ -353,17 +358,27 @@ public class ProjectFunctions
                 Collaborators = new[]
                 {
                     // Get the owner profile
-                    _context.Profiles
-                        .Where(profile => profile.Id == p.ProfileId)
-                        .Select(profile => new { profile.Name, profile.ProfileUrl })
-                        .FirstOrDefault()
+                    allProfiles.GetValueOrDefault(p.ProfileId) != null
+                        ? new {
+                            ProfileId = allProfiles[p.ProfileId].Id,
+                            Name = allProfiles[p.ProfileId].Name,
+                            Email = allProfiles[p.ProfileId].User?.Email ?? string.Empty,
+                            ProfileUrl = allProfiles[p.ProfileId].ProfileUrl
+                        }
+                        : null
                 }
                 .Concat(
                     // Get all collaborators
                     p.ProjectCollaborators
-                        .Select(pc => new { pc.Profile.Name, pc.Profile.ProfileUrl })
+                        .Where(pc => pc.ProfileId != p.ProfileId)
+                        .Select(pc => new {
+                            ProfileId = pc.Profile.Id,
+                            Name = pc.Profile.Name,
+                            Email = pc.Profile.User?.Email ?? string.Empty,
+                            ProfileUrl = pc.Profile.ProfileUrl
+                        })
                 )
-                .Where(c => c != null)
+                .Where(c => c != null && !string.IsNullOrEmpty(c.Email))
                 .Distinct()
                 .ToList()
             }).ToList();
@@ -385,6 +400,133 @@ public class ProjectFunctions
 
             var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
             await errorResponse.WriteStringAsync("An error occurred while getting user projects");
+            return errorResponse;
+        }
+    }
+
+    [Function("GetProjectAnalysis")]
+    [JwtAuth]
+    public async Task<HttpResponseData> GetProjectAnalysis(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "projects/{projectId}/analysis")] HttpRequestData req,
+        int projectId,
+        FunctionContext context)
+    {
+        _logger.LogInformation("Getting analysis data for project ID: {ProjectId}", projectId);
+
+        try
+        {
+            var authInfo = req.ValidateJwtIfRequired(context);
+            if (!authInfo.HasValue)
+            {
+                var unauthorizedResponse = req.CreateResponse(HttpStatusCode.Unauthorized);
+                await unauthorizedResponse.WriteStringAsync("Unauthorized");
+                return unauthorizedResponse;
+            }
+
+            // Get user's profile
+            var profile = await _context.Profiles
+                .FirstOrDefaultAsync(p => p.UserId == authInfo.Value.UserId);
+
+            if (profile == null)
+            {
+                var notFoundResponse = req.CreateResponse(HttpStatusCode.NotFound);
+                await notFoundResponse.WriteStringAsync("Profile not found");
+                return notFoundResponse;
+            }
+
+            // Check if user has access to this project (is owner or collaborator)
+            var hasAccess = await _context.Projects
+                .Where(p => p.Id == projectId)
+                .Where(p => p.ProfileId == profile.Id || 
+                           p.ProjectCollaborators.Any(c => c.ProfileId == profile.Id))
+                .AnyAsync();
+
+            if (!hasAccess)
+            {
+                var forbiddenResponse = req.CreateResponse(HttpStatusCode.Forbidden);
+                await forbiddenResponse.WriteStringAsync("You don't have access to this project");
+                return forbiddenResponse;
+            }
+
+            // Get all impacts for this project with their SDG associations
+            var impacts = await _context.Impacts
+                .Where(i => i.ProjectId == projectId)
+                .Include(i => i.ImpactSdgs)
+                .ToListAsync();
+
+            // Calculate summary statistics
+            var totalEntries = impacts.Count;
+            var sdgsCovered = impacts
+                .SelectMany(i => i.ImpactSdgs.Select(is2 => is2.SdgId))
+                .Distinct()
+                .Count();
+            var activeDimensions = impacts
+                .Select(i => i.Dimension)
+                .Distinct()
+                .Count();
+
+            // Calculate impact distribution by RelationType
+            var impactDistribution = Enum.GetValues<RelationType>()
+                .Select(rt => new
+                {
+                    name = rt.ToString(),
+                    value = impacts.Count(i => i.Relation == rt)
+                })
+                .Where(x => x.value > 0)
+                .ToList();
+
+            // Calculate dimension distribution by SustainabilityDimension
+            var dimensionDistribution = Enum.GetValues<SustainabilityDimension>()
+                .Select(sd => new
+                {
+                    name = sd.ToString(),
+                    value = impacts.Count(i => i.Dimension == sd)
+                })
+                .Where(x => x.value > 0)
+                .ToList();
+
+            // Calculate SDG counts
+            var sdgCounts = impacts
+                .SelectMany(i => i.ImpactSdgs.Select(is2 => is2.SdgId))
+                .GroupBy(sdgId => sdgId)
+                .Select(g => new
+                {
+                    sdg = g.Key,
+                    count = g.Count()
+                })
+                .OrderBy(x => x.sdg)
+                .ToList();
+
+            var analysisData = new
+            {
+                summary = new
+                {
+                    totalEntries,
+                    sdgsCovered,
+                    activeDimensions
+                },
+                impactDistribution,
+                dimensionDistribution,
+                sdgCounts
+            };
+
+            var response = req.CreateResponse(HttpStatusCode.OK);
+            response.Headers.Add("Content-Type", "application/json; charset=utf-8");
+
+            await response.WriteStringAsync(JsonSerializer.Serialize(analysisData, _jsonOptions));
+            return response;
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogWarning("Unauthorized access attempt: {Message}", ex.Message);
+            return req.CreateUnauthorizedResponse(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting project analysis for project ID: {ProjectId}", projectId);
+
+            var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
+            await errorResponse.WriteStringAsync("An error occurred while getting project analysis");
             return errorResponse;
         }
     }
