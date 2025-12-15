@@ -41,10 +41,49 @@ public class ProjectCollaboratorFunctions
         try
         {
             var authInfo = req.ValidateJwtIfRequired(context);
-            var collaborators = await _context.ProjectCollaborators
-                .Where(pc => pc.ProjectId == projectId)
+            
+            // Get the project to find the owner
+            var project = await _context.Projects.FindAsync(projectId);
+            if (project == null)
+            {
+                var notFoundResponse = req.CreateResponse(HttpStatusCode.NotFound);
+                await notFoundResponse.WriteStringAsync($"Project with ID {projectId} not found");
+                return notFoundResponse;
+            }
+
+            var collaborators = new List<object>();
+
+            // Add owner first
+            var owner = await _context.Profiles
+                .Include(p => p.User)
+                .FirstOrDefaultAsync(p => p.Id == project.ProfileId);
+            
+            if (owner != null)
+            {
+                collaborators.Add(new
+                {
+                    ProfileId = owner.Id,
+                    Name = owner.Name,
+                    ProfileUrl = owner.ProfileUrl,
+                    Email = owner.User.Email
+                });
+            }
+
+            // Add other collaborators (excluding owner if they're also listed)
+            var projectCollaborators = await _context.ProjectCollaborators
+                .Where(pc => pc.ProjectId == projectId && pc.ProfileId != project.ProfileId)
                 .Include(pc => pc.Profile)
+                    .ThenInclude(p => p.User)
+                .Select(pc => new
+                {
+                    ProfileId = pc.Profile.Id,
+                    Name = pc.Profile.Name,
+                    ProfileUrl = pc.Profile.ProfileUrl,
+                    Email = pc.Profile.User.Email
+                })
                 .ToListAsync();
+
+            collaborators.AddRange(projectCollaborators);
 
             var response = req.CreateResponse(HttpStatusCode.OK);
             response.Headers.Add("Content-Type", "application/json; charset=utf-8");
@@ -167,28 +206,80 @@ public class ProjectCollaboratorFunctions
     [Function("RemoveCollaborator")]
     [JwtAuth]
     public async Task<HttpResponseData> RemoveCollaborator(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "collaborators/{collaboratorId}")] HttpRequestData req,
-        int collaboratorId,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "projects/{projectId}/collaborators/{profileId}")] HttpRequestData req,
+        int projectId,
+        int profileId,
         FunctionContext context)
     {
-        _logger.LogInformation($"Removing collaborator ID: {collaboratorId}");
+        _logger.LogInformation($"Removing collaborator with profile ID {profileId} from project {projectId}");
 
         try
         {
             var authInfo = req.ValidateJwtIfRequired(context);
-            var collaborator = await _context.ProjectCollaborators.FindAsync(collaboratorId);
-            if (collaborator == null)
+            
+            // Get the project
+            var project = await _context.Projects.FindAsync(projectId);
+            if (project == null)
             {
                 var notFoundResponse = req.CreateResponse(HttpStatusCode.NotFound);
-                await notFoundResponse.WriteStringAsync($"Collaborator with ID {collaboratorId} not found");
+                await notFoundResponse.WriteStringAsync($"Project with ID {projectId} not found");
                 return notFoundResponse;
             }
 
-            _context.ProjectCollaborators.Remove(collaborator);
-            await _context.SaveChangesAsync();
+            // Check if we're removing the owner
+            if (project.ProfileId == profileId)
+            {
+                // Get other collaborators
+                var otherCollaborators = await _context.ProjectCollaborators
+                    .Where(pc => pc.ProjectId == projectId)
+                    .ToListAsync();
 
-            var response = req.CreateResponse(HttpStatusCode.NoContent);
-            return response;
+                if (otherCollaborators.Any())
+                {
+                    // Transfer ownership to the first collaborator
+                    var newOwner = otherCollaborators.First();
+                    project.ProfileId = newOwner.ProfileId;
+                    
+                    // Remove the new owner from collaborators table to avoid duplication
+                    _context.ProjectCollaborators.Remove(newOwner);
+                    
+                    await _context.SaveChangesAsync();
+                    
+                    var transferResponse = req.CreateResponse(HttpStatusCode.OK);
+                    await transferResponse.WriteStringAsync($"Ownership transferred to profile ID {newOwner.ProfileId}");
+                    return transferResponse;
+                }
+                else
+                {
+                    // No other collaborators - delete the project
+                    _context.Projects.Remove(project);
+                    await _context.SaveChangesAsync();
+                    
+                    var deleteResponse = req.CreateResponse(HttpStatusCode.OK);
+                    deleteResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
+                    await deleteResponse.WriteStringAsync(JsonSerializer.Serialize(new { projectDeleted = true }, _jsonOptions));
+                    return deleteResponse;
+                }
+            }
+            else
+            {
+                // Removing a regular collaborator
+                var collaborator = await _context.ProjectCollaborators
+                    .FirstOrDefaultAsync(pc => pc.ProjectId == projectId && pc.ProfileId == profileId);
+                
+                if (collaborator == null)
+                {
+                    var notFoundResponse = req.CreateResponse(HttpStatusCode.NotFound);
+                    await notFoundResponse.WriteStringAsync($"Collaborator with profile ID {profileId} not found in project {projectId}");
+                    return notFoundResponse;
+                }
+
+                _context.ProjectCollaborators.Remove(collaborator);
+                await _context.SaveChangesAsync();
+
+                var response = req.CreateResponse(HttpStatusCode.NoContent);
+                return response;
+            }
         }
         catch (UnauthorizedAccessException ex)
         {
@@ -197,7 +288,7 @@ public class ProjectCollaboratorFunctions
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"Error removing collaborator ID: {collaboratorId}");
+            _logger.LogError(ex, $"Error removing collaborator profile ID {profileId} from project {projectId}");
 
             var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
             await errorResponse.WriteStringAsync("An error occurred while removing collaborator");
