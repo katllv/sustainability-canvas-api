@@ -7,12 +7,14 @@ namespace SustainabilityCanvas.Api.Services;
 public class MasterPasswordService
 {
     private readonly SustainabilityCanvasContext _context;
-    private readonly string _defaultPassword = "adminmaster2025";
+    private readonly string _defaultPassword;
     private const string MASTER_PASSWORD_KEY = "MasterPassword";
 
     public MasterPasswordService(SustainabilityCanvasContext context)
     {
         _context = context;
+        _defaultPassword = Environment.GetEnvironmentVariable("DEFAULT_MASTER_PASSWORD") 
+            ?? throw new InvalidOperationException("DEFAULT_MASTER_PASSWORD environment variable is required. Please configure it in Azure App Settings.");
     }
 
     public async Task<string> GetCurrentPasswordAsync()

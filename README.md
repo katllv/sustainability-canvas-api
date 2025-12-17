@@ -31,13 +31,17 @@ Create `local.settings.json` in the project root (use `local.settings.json.templ
 {
 	"IsEncrypted": false,
 	"Values": {
-		"FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated"
+		"FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+		"JWT_SECRET_KEY": "your-local-dev-secret-key-at-least-32-characters-long-for-security",
+		"DEFAULT_MASTER_PASSWORD": "your-local-master-password"
 	},
 	"ConnectionStrings": {
 		"DefaultConnection": "Host=localhost;Port=5432;Database=postgres;Username=your_username;Password=your_password"
 	}
 }
 ```
+
+**Important:** Never commit `local.settings.json` to version control!
 
 #### 3. Database Migration
 
@@ -67,7 +71,7 @@ yarn dev
 
 The API is configured to allow requests from:
 
-- Production frontend: `https://your-production-domain.com`
+- Production frontend: `https://agreeable-hill-0630dd403.3.azurestaticapps.net`
 - Local development: `http://localhost:5173`
 
 Configuration is in `host.json`:
@@ -78,7 +82,7 @@ Configuration is in `host.json`:
 		"http": {
 			"cors": {
 				"allowedOrigins": [
-					"https://your-production-domain.com",
+					"https://agreeable-hill-0630dd403.3.azurestaticapps.net",
 					"http://localhost:5173"
 				],
 				"allowCredentials": false
@@ -96,11 +100,10 @@ Configuration is in `host.json`:
 curl -X POST http://localhost:7071/api/users/admin/create \
   -H "Content-Type: application/json" \
   -d '{
-    "username": "admin",
+    "email": "admin@example.com",
     "password": "YourSecurePassword",
     "name": "Admin User",
-    "email": "admin@example.com",
-    "masterPassword": "YourMasterPassword"
+    "masterPassword": "your-local-master-password"
   }'
 ```
 
@@ -110,10 +113,9 @@ curl -X POST http://localhost:7071/api/users/admin/create \
 curl -X POST http://localhost:7071/api/auth/register \
   -H "Content-Type: application/json" \
   -d '{
-    "username": "student1",
+    "email": "student1@example.com",
     "password": "YourPassword123",
     "name": "Student One",
-    "email": "student1@example.com",
     "registrationCode": "YourRegistrationCode"
   }'
 ```
@@ -124,10 +126,90 @@ curl -X POST http://localhost:7071/api/auth/register \
 curl -X POST http://localhost:7071/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{
-    "username": "student1",
+    "email": "student1@example.com",
     "password": "YourPassword123"
   }'
 ```
+
+Save the `token` from the response and use it in subsequent requests:
+
+```bash
+curl -X GET http://localhost:7071/api/profiles/1/projects \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN_HERE"
+```
+
+## Key Features
+
+### Authentication & Authorization
+- **Email-based authentication** with JWT tokens
+- **BCrypt password hashing** for secure storage
+- **Role-based access control** (User, Admin)
+- **Registration code system** to control user registration
+- **Master password** for admin creation
+
+### Project Management
+- Create and manage sustainability projects
+- **Collaborative projects** with email-based invitations
+- **Ownership transfer** when removing project owner
+- Automatic project deletion if no collaborators remain
+
+### Impact Assessment
+- Create impacts with **1-5 scoring system**
+- Title and description for each impact
+- Categorize by **sustainability dimensions** (Environmental, Social, Economic)
+- Link impacts to **UN SDGs** (Sustainable Development Goals)
+- Track **relation types** (Direct, Indirect, Hidden)
+
+### Analytics
+- **Project analysis endpoint** (`GET /projects/{id}/analysis`)
+- Score distribution and sentiment analysis
+- SDG coverage metrics
+- Impact and dimension breakdowns
+
+## API Endpoints
+
+### Authentication
+- `POST /api/auth/register` - Register new user (requires registration code)
+- `POST /api/auth/login` - Login and receive JWT token
+- `PUT /api/users/email` - Update user email
+
+### Admin
+- `POST /api/users/admin/create` - Create admin user (requires master password)
+- `GET /api/users/admin/all` - Get all users (admin only)
+- `DELETE /api/users/admin/{userId}` - Delete user (admin only)
+- `GET /api/management/registration-code` - Get current registration code (admin only)
+- `POST /api/management/registration-code` - Set registration code (admin only)
+- `GET /api/management/master-password` - Get master password (admin only)
+- `POST /api/management/master-password` - Set master password (admin only)
+
+### Projects
+- `GET /api/projects` - Get all projects
+- `GET /api/projects/{id}` - Get project by ID
+- `POST /api/projects` - Create project
+- `PUT /api/projects/{id}` - Update project
+- `DELETE /api/projects/{id}` - Delete project
+- `GET /api/profiles/{profileId}/projects` - Get user's projects
+- `GET /api/profiles/{profileId}/projects-full` - Get projects with collaborators
+- `GET /api/projects/{projectId}/analysis` - Get project analytics
+
+### Collaborators
+- `GET /api/projects/{projectId}/collaborators` - Get all collaborators (includes owner)
+- `POST /api/projects/{projectId}/collaborators` - Add collaborator by email
+- `DELETE /api/projects/{projectId}/collaborators/{profileId}` - Remove collaborator
+
+### Impacts
+- `GET /api/projects/{projectId}/impacts` - Get all impacts for project
+- `POST /api/impacts` - Create impact
+- `PUT /api/impacts/{id}` - Update impact
+- `DELETE /api/impacts/{id}` - Delete impact
+
+### Profiles
+- `GET /api/profiles/{id}` - Get profile by ID
+- `PUT /api/profiles/{id}` - Update profile
+- `DELETE /api/profiles/{id}` - Delete profile
+
+### SDGs
+- `GET /api/sdgs` - Get all SDGs
 
 ## API Security
 
@@ -135,4 +217,11 @@ curl -X POST http://localhost:7071/api/auth/login \
 - Admin endpoints require admin role in JWT token
 - Registration requires valid registration code (controlled by admin)
 - Admin creation requires master password
+- **Environment variables required**: `JWT_SECRET_KEY` (min 32 chars), `DEFAULT_MASTER_PASSWORD`
 - CORS protection prevents unauthorized browser access
+- Passwords hashed with BCrypt
+- No hardcoded secrets in source code
+
+## Deployment
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed Azure deployment instructions.

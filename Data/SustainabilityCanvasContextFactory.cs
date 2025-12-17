@@ -20,7 +20,7 @@ public class SustainabilityCanvasContextFactory : IDesignTimeDbContextFactory<Su
         // Get connection string
         var connectionString = configuration.GetConnectionString("DefaultConnection") 
             ?? configuration["Values:ConnectionStrings:DefaultConnection"]
-            ?? "Host=localhost;Database=sustainability_canvas;Username=postgres;Password=password";
+            ?? throw new InvalidOperationException("Database connection string 'DefaultConnection' is required. Please configure it in local.settings.json or Azure Connection Strings.");
 
         optionsBuilder.UseNpgsql(connectionString);
 

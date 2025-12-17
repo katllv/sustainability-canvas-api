@@ -14,11 +14,18 @@ public class JwtService
 
     public JwtService()
     {
-        // In production, these should come from configuration/environment variables
-        _secretKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY") ?? "your-super-secret-key-that-should-be-at-least-32-characters-long";
+        // Environment variables are required for security
+        _secretKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY") 
+            ?? throw new InvalidOperationException("JWT_SECRET_KEY environment variable is required. Please configure it in Azure App Settings.");
         _issuer = Environment.GetEnvironmentVariable("JWT_ISSUER") ?? "sustainability-canvas-api";
         _audience = Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? "sustainability-canvas-client";
         _expirationHours = int.Parse(Environment.GetEnvironmentVariable("JWT_EXPIRATION_HOURS") ?? "2");
+        
+        // Validate secret key length for security
+        if (_secretKey.Length < 32)
+        {
+            throw new InvalidOperationException("JWT_SECRET_KEY must be at least 32 characters long for security.");
+        }
     }
 
     public string GenerateToken(int userId, string email, string role)
