@@ -3,6 +3,8 @@
   "Values": {
     "AzureWebJobsStorage": "UseDevelopmentStorage=true",
     "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated"
+    "JWT_SECRET_KEY": "local-dev-secret-key-at-least-32-characters-long-for-development",
+    "DEFAULT_MASTER_PASSWORD": "localmasterpassword"
   },
   "ConnectionStrings": {
     "DefaultConnection": "Host=localhost;Port=5432;Database=your_db_name;Username=your_username;Password=your_password"
