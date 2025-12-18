@@ -435,6 +435,85 @@ public class UserFunctions
         }
     }
 
+    [Function("DeleteAllNonAdminUsers")]
+    [JwtAuth(requireAdmin: true)]
+    public async Task<HttpResponseData> DeleteAllNonAdminUsers(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "users/admin/delete-all-non-admin")] HttpRequestData req,
+        FunctionContext context)
+    {
+        _logger.LogInformation("Deleting all non-admin users (Admin only)");
+
+        try
+        {
+            var authInfo = req.ValidateJwtIfRequired(context);
+
+            // Get all non-admin users with their profiles
+            var nonAdminUsers = await _context.Users
+                .Where(u => u.Role == UserRole.User)
+                .Include(u => u.Profile)
+                .ToListAsync();
+
+            var deleteCount = nonAdminUsers.Count;
+
+            if (deleteCount == 0)
+            {
+                var response = req.CreateResponse(HttpStatusCode.OK);
+                response.Headers.Add("Content-Type", "application/json; charset=utf-8");
+                await response.WriteStringAsync(JsonSerializer.Serialize(new { message = "No non-admin users to delete", deletedCount = 0 }, _jsonOptions));
+                return response;
+            }
+
+            // Get all profile IDs
+            var profileIds = nonAdminUsers
+                .Where(u => u.Profile != null)
+                .Select(u => u.Profile!.Id)
+                .ToList();
+
+            // Delete all projects owned by these profiles
+            var projectsToDelete = await _context.Projects
+                .Where(p => profileIds.Contains(p.ProfileId))
+                .ToListAsync();
+            _context.Projects.RemoveRange(projectsToDelete);
+
+            // Delete all collaborator records for these profiles
+            var collaboratorsToDelete = await _context.ProjectCollaborators
+                .Where(pc => profileIds.Contains(pc.ProfileId))
+                .ToListAsync();
+            _context.ProjectCollaborators.RemoveRange(collaboratorsToDelete);
+
+            // Now delete all non-admin users (cascade will delete profiles)
+            _context.Users.RemoveRange(nonAdminUsers);
+            
+            await _context.SaveChangesAsync();
+
+            var successResponse = req.CreateResponse(HttpStatusCode.OK);
+            successResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
+            
+            var responseData = new
+            {
+                message = $"Successfully deleted {deleteCount} non-admin user(s) and their associated data",
+                deletedCount = deleteCount,
+                projectsDeleted = projectsToDelete.Count,
+                collaborationsDeleted = collaboratorsToDelete.Count
+            };
+
+            await successResponse.WriteStringAsync(JsonSerializer.Serialize(responseData, _jsonOptions));
+            return successResponse;
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogWarning("Unauthorized access attempt: {Message}", ex.Message);
+            return req.CreateUnauthorizedResponse(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting all non-admin users");
+            var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
+            await errorResponse.WriteStringAsync("An error occurred while deleting non-admin users");
+            return errorResponse;
+        }
+    }
+
     [Function("CreateAdmin")]
     public async Task<HttpResponseData> CreateAdmin([HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "users/admin/create")] HttpRequestData req)
     {
