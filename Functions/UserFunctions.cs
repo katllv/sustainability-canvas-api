@@ -44,6 +44,12 @@ public class SetMasterPasswordRequest
     public string NewMasterPassword { get; set; } = string.Empty;
 }
 
+public class ChangePasswordRequest
+{
+    public string CurrentPassword { get; set; } = string.Empty;
+    public string NewPassword { get; set; } = string.Empty;
+}
+
 public class UserFunctions
 {
     private readonly SustainabilityCanvasContext _context;
@@ -342,6 +348,92 @@ public class UserFunctions
         }
     }
 
+    [Function("ChangePassword")]
+    [JwtAuth]
+    public async Task<HttpResponseData> ChangePassword(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "users/password")] HttpRequestData req,
+        FunctionContext context)
+    {
+        _logger.LogInformation("Changing user password");
+
+        try
+        {
+            var authInfo = req.ValidateJwtIfRequired(context);
+            if (!authInfo.HasValue)
+            {
+                var unauthorizedResponse = req.CreateResponse(HttpStatusCode.Unauthorized);
+                await unauthorizedResponse.WriteStringAsync("Unauthorized");
+                return unauthorizedResponse;
+            }
+
+            var requestBody = await req.ReadAsStringAsync();
+
+            if (string.IsNullOrEmpty(requestBody))
+            {
+                var badRequestResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+                await badRequestResponse.WriteStringAsync("Request body is empty");
+                return badRequestResponse;
+            }
+
+            var changePasswordRequest = JsonSerializer.Deserialize<ChangePasswordRequest>(requestBody, _jsonOptions);
+            if (changePasswordRequest == null || 
+                string.IsNullOrEmpty(changePasswordRequest.CurrentPassword) || 
+                string.IsNullOrEmpty(changePasswordRequest.NewPassword))
+            {
+                var badRequestResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+                await badRequestResponse.WriteStringAsync("Current password and new password are required");
+                return badRequestResponse;
+            }
+
+            // Get the user
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == authInfo.Value.UserId);
+
+            if (user == null)
+            {
+                var notFoundResponse = req.CreateResponse(HttpStatusCode.NotFound);
+                await notFoundResponse.WriteStringAsync("User not found");
+                return notFoundResponse;
+            }
+
+            // Verify current password
+            bool isCurrentPasswordValid = BCrypt.Net.BCrypt.Verify(changePasswordRequest.CurrentPassword, user.PasswordHash);
+            
+            if (!isCurrentPasswordValid)
+            {
+                var unauthorizedResponse = req.CreateResponse(HttpStatusCode.Unauthorized);
+                await unauthorizedResponse.WriteStringAsync("Current password is incorrect");
+                return unauthorizedResponse;
+            }
+
+            // Update to new password
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(changePasswordRequest.NewPassword);
+            await _context.SaveChangesAsync();
+
+            var response = req.CreateResponse(HttpStatusCode.OK);
+            response.Headers.Add("Content-Type", "application/json; charset=utf-8");
+
+            var responseData = new
+            {
+                message = "Password changed successfully"
+            };
+
+            await response.WriteStringAsync(JsonSerializer.Serialize(responseData, _jsonOptions));
+            return response;
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogWarning("Unauthorized access attempt: {Message}", ex.Message);
+            return req.CreateUnauthorizedResponse(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error changing password");
+            var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
+            await errorResponse.WriteStringAsync("Failed to change password");
+            return errorResponse;
+        }
+    }
+
     // ADMIN FUNCTIONS
 
     [Function("GetAllUsers")]
@@ -414,11 +506,114 @@ public class UserFunctions
                 return notFound;
             }
 
-            // This will cascade delete Profile and all related data (Projects, Impacts, etc.)
+            // Check if this is an admin and if they're the last admin
+            if (user.Role == UserRole.Admin)
+            {
+                var adminCount = await _context.Users.CountAsync(u => u.Role == UserRole.Admin);
+                if (adminCount <= 1)
+                {
+                    var forbidden = req.CreateResponse(HttpStatusCode.Forbidden);
+                    await forbidden.WriteStringAsync("Cannot delete the last admin user");
+                    return forbidden;
+                }
+            }
+
+            if (user.Profile == null)
+            {
+                var notFound = req.CreateResponse(HttpStatusCode.NotFound);
+                await notFound.WriteStringAsync("User profile not found");
+                return notFound;
+            }
+
+            var profileId = user.Profile.Id;
+
+            // Get all projects owned by this user
+            var ownedProjects = await _context.Projects
+                .Where(p => p.ProfileId == profileId)
+                .Include(p => p.ProjectCollaborators)
+                .ToListAsync();
+
+            var projectsDeleted = 0;
+            var collaborationsRemoved = 0;
+
+            foreach (var project in ownedProjects)
+            {
+                // Check if there are other collaborators
+                var otherCollaborators = project.ProjectCollaborators
+                    .Where(pc => pc.ProfileId != profileId)
+                    .ToList();
+
+                if (otherCollaborators.Count == 0)
+                {
+                    // No other collaborators, delete the entire project
+                    // First delete all impacts related to this project
+                    var impactIds = await _context.Impacts
+                        .Where(i => i.ProjectId == project.Id)
+                        .Select(i => i.Id)
+                        .ToListAsync();
+
+                    if (impactIds.Any())
+                    {
+                        // Delete ImpactSdg relationships
+                        var impactSdgs = await _context.ImpactSdgs
+                            .Where(isg => impactIds.Contains(isg.ImpactId))
+                            .ToListAsync();
+                        _context.ImpactSdgs.RemoveRange(impactSdgs);
+
+                        // Delete Impacts
+                        var impacts = await _context.Impacts
+                            .Where(i => impactIds.Contains(i.Id))
+                            .ToListAsync();
+                        _context.Impacts.RemoveRange(impacts);
+                    }
+
+                    // Delete all collaborators for this project
+                    _context.ProjectCollaborators.RemoveRange(project.ProjectCollaborators);
+
+                    // Delete the project
+                    _context.Projects.Remove(project);
+                    projectsDeleted++;
+                }
+                else
+                {
+                    // Other collaborators exist, just remove this user's ownership/collaboration
+                    // Transfer ownership to first remaining collaborator
+                    var newOwner = otherCollaborators.First();
+                    project.ProfileId = newOwner.ProfileId;
+
+                    // Remove this user's collaborator record
+                    var userCollaboration = project.ProjectCollaborators
+                        .FirstOrDefault(pc => pc.ProfileId == profileId);
+                    if (userCollaboration != null)
+                    {
+                        _context.ProjectCollaborators.Remove(userCollaboration);
+                        collaborationsRemoved++;
+                    }
+                }
+            }
+
+            // Delete any collaborator records where this user is a collaborator (but not owner)
+            var otherCollaborations = await _context.ProjectCollaborators
+                .Where(pc => pc.ProfileId == profileId)
+                .ToListAsync();
+            _context.ProjectCollaborators.RemoveRange(otherCollaborations);
+            collaborationsRemoved += otherCollaborations.Count;
+
+            // Now delete the user (cascade will delete profile)
             _context.Users.Remove(user);
             await _context.SaveChangesAsync();
 
-            var response = req.CreateResponse(HttpStatusCode.NoContent);
+            var response = req.CreateResponse(HttpStatusCode.OK);
+            response.Headers.Add("Content-Type", "application/json; charset=utf-8");
+            
+            var responseData = new
+            {
+                message = "User deleted successfully",
+                projectsDeleted,
+                collaborationsRemoved
+            };
+
+            await response.WriteStringAsync(JsonSerializer.Serialize(responseData, _jsonOptions));
             return response;
         }
         catch (UnauthorizedAccessException ex)
