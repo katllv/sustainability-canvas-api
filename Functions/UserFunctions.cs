@@ -348,13 +348,13 @@ public class UserFunctions
         }
     }
 
-    [Function("ChangePassword")]
+    [Function("UpdateUserPassword")]
     [JwtAuth]
-    public async Task<HttpResponseData> ChangePassword(
+    public async Task<HttpResponseData> UpdateUserPassword(
         [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "users/password")] HttpRequestData req,
         FunctionContext context)
     {
-        _logger.LogInformation("Changing user password");
+        _logger.LogInformation("Updating user password");
 
         try
         {
